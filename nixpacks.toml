@@ -1,0 +1,3 @@
+# Tells Railway's nixpacks builder to install ffmpeg (required for video transcription)
+[phases.setup]
+nixPkgs = ["ffmpeg"]

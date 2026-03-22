@@ -1,0 +1,1669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Jira → ADO Bug Pipeline</title>
+<style>
+:root{
+  --brand:#1a2535;--brand-light:#1e6fd4;--brand-dark:#0f1c2b;
+  --bg:#f2f4f8;--card:#fff;--border:#e2e8f0;--text:#1a2535;--muted:#64748b;
+  --success:#16a34a;--success-bg:#f0fdf4;--error:#b91c1c;--error-bg:#fff5f5;
+  --warn:#d97706;--warn-bg:#fffbeb;--info:#1e6fd4;--info-bg:#eff6ff;
+  --radius:14px;--shadow:0 2px 16px rgba(26,37,53,.07),0 1px 4px rgba(26,37,53,.05);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+header{background:var(--brand);color:#fff;padding:0 36px;height:58px;display:flex;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,.2)}
+.logo{display:flex;align-items:center;gap:14px;font-size:1rem;font-weight:600;letter-spacing:.01em}
+.logo img{height:28px;opacity:.9}
+main{max-width:980px;margin:36px auto;padding:0 24px;display:flex;flex-direction:column;gap:20px}
+
+.card{background:var(--card);border-radius:var(--radius);padding:28px 32px;box-shadow:var(--shadow)}
+.card-title{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:20px;display:flex;align-items:center;gap:10px}
+.step-num{background:var(--brand);color:#fff;border-radius:50%;width:24px;height:24px;font-size:.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* JQL input */
+.jql-row{display:flex;gap:12px;align-items:stretch}
+#jql-input{flex:1;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:.9rem;font-family:inherit;color:var(--text)}
+#jql-input:focus{outline:none;border-color:var(--brand-light);box-shadow:0 0 0 3px rgba(30,111,212,.12)}
+#run-btn{padding:10px 28px;background:var(--brand);color:#fff;font-size:.9rem;font-weight:700;border:none;border-radius:8px;cursor:pointer;white-space:nowrap;transition:background .2s}
+#run-btn:hover{background:var(--brand-dark)}
+#run-btn:disabled{background:var(--muted);cursor:not-allowed}
+.jql-help{font-size:.78rem;color:var(--muted);margin-top:8px}
+.jql-help code{background:#f0f4ff;padding:1px 5px;border-radius:4px;font-family:monospace;font-size:.85em;color:var(--brand)}
+
+/* Progress */
+#progress-card{display:none}
+.pbar-wrap{background:#e2e8f0;border-radius:99px;height:8px;overflow:hidden;margin-bottom:16px}
+.pbar{background:var(--brand-light);height:100%;border-radius:99px;transition:width .5s}
+.pstatus{font-size:.87rem;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+.pstatus strong{color:var(--text)}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--brand-light);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Results */
+#results-card{display:none}
+.results-tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px}
+.tab-btn{padding:10px 20px;font-size:.88rem;font-weight:600;color:var(--muted);border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .2s,border-color .2s}
+.tab-btn.active{color:var(--brand-light);border-bottom-color:var(--brand-light)}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* Table */
+.results-table{width:100%;border-collapse:collapse;font-size:.87rem}
+.results-table th{text-align:left;padding:8px 12px;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);white-space:nowrap}
+.results-table th.sortable{cursor:pointer;user-select:none}
+.results-table th.sortable:hover{color:var(--brand);background:#f8fafc}
+.results-table th.sort-asc::after{content:' ▲';font-size:.6rem;color:var(--brand)}
+.results-table th.sort-desc::after{content:' ▼';font-size:.6rem;color:var(--brand)}
+.results-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.results-table tr:last-child td{border-bottom:none}
+.results-table tr:hover td{background:#f8fafc}
+/* Filter toolbar */
+.filter-toolbar{display:flex;gap:8px;align-items:center;padding:10px 0 6px;flex-wrap:nowrap;overflow-x:auto}
+.filter-toolbar input[type=text]{flex:1 1 160px;min-width:0;max-width:260px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;outline:none}
+.filter-toolbar input[type=text]:focus{border-color:var(--brand-light);box-shadow:0 0 0 3px rgba(99,102,241,.08)}
+.filter-toolbar select{flex-shrink:0;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:#fff;cursor:pointer;color:var(--text)}
+.filter-toolbar .clear-filters{flex-shrink:0;font-size:.76rem;color:var(--muted);background:none;border:none;cursor:pointer;padding:3px 8px;border-radius:4px;white-space:nowrap}
+.filter-toolbar .clear-filters:hover{color:var(--error);background:#fff5f5}
+.filter-count{flex-shrink:0;font-size:.76rem;color:var(--muted);margin-left:auto;white-space:nowrap}
+.jira-key{font-weight:700;color:var(--brand-light);font-size:.85rem}
+.jira-key a{color:inherit;text-decoration:none}
+.jira-key a:hover{text-decoration:underline}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:99px;font-size:.72rem;font-weight:600}
+.badge-green{background:var(--success-bg);color:var(--success)}
+.badge-warn{background:var(--warn-bg);color:var(--warn)}
+.badge-blue{background:var(--info-bg);color:var(--info)}
+.badge-gray{background:#f1f5f9;color:var(--muted)}
+.conf-bar{display:flex;align-items:center;gap:8px}
+.conf-pip{width:60px;height:6px;background:#e2e8f0;border-radius:99px;overflow:hidden}
+.conf-fill{height:100%;border-radius:99px;background:var(--brand-light)}
+.conf-fill.high{background:var(--success)}
+.conf-fill.med{background:var(--warn)}
+.conf-fill.low{background:var(--error)}
+.action-btn{padding:5px 14px;font-size:.8rem;font-weight:600;border:1.5px solid var(--border);border-radius:6px;cursor:pointer;background:#fff;color:var(--text);transition:all .2s}
+.action-btn.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+.action-btn.primary:hover{background:var(--brand-dark)}
+.action-btn:hover{border-color:var(--brand-light);color:var(--brand-light)}
+.missing-tags{display:flex;flex-wrap:wrap;gap:4px}
+.missing-tag{background:#fff5f5;color:var(--error);border:1px solid #fecaca;border-radius:4px;padding:2px 7px;font-size:.72rem}
+.row-submitted td{opacity:.72}
+.badge-submitted{background:var(--success-bg);color:var(--success)}
+.action-btn.reprocess{font-size:.76rem;padding:4px 10px;color:var(--muted)}
+.action-btn.reprocess:hover{color:var(--brand-light);border-color:var(--brand-light)}
+.action-btn.reprocess:disabled{opacity:.5;cursor:not-allowed}
+
+/* Attach list */
+.attach-list-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.attach-list-header .label{font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.attach-list-header .sel-links{display:flex;gap:10px;font-size:.75rem;color:var(--brand)}
+.attach-list-header .sel-links span{cursor:pointer}
+.attach-list-header .sel-links span:hover{text-decoration:underline}
+.attach-row{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:#fff;margin-bottom:4px;cursor:pointer;transition:background .15s;user-select:none}
+.attach-row:hover{background:#f8fafc}
+.attach-row.excluded{opacity:.42}
+.attach-row.excluded .attach-row-name{text-decoration:line-through;color:var(--muted)}
+.attach-row input[type=checkbox]{width:14px;height:14px;cursor:pointer;flex-shrink:0;accent-color:var(--brand);pointer-events:none}
+.attach-row-icon{font-size:.95rem;flex-shrink:0;width:20px;text-align:center}
+.attach-row-name{flex:1;font-size:.78rem;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.attach-row-meta{font-size:.71rem;color:var(--muted);white-space:nowrap;flex-shrink:0;max-width:120px;overflow:hidden;text-overflow:ellipsis}
+.attach-row-open{font-size:.75rem;color:var(--brand);background:none;border:1px solid transparent;cursor:pointer;padding:2px 6px;border-radius:4px;flex-shrink:0;opacity:.65;transition:opacity .15s,border-color .15s}
+.attach-row-open:hover{opacity:1;border-color:var(--brand-light)}
+.attach-extra-video{background:#fef9c3;border:1px solid #fde68a;border-radius:6px;padding:7px 10px;font-size:.76rem;color:#92400e;margin-bottom:6px}
+
+.empty-state{text-align:center;padding:48px 24px;color:var(--muted)}
+.empty-state .icon{font-size:2.5rem;margin-bottom:12px}
+.empty-state p{font-size:.9rem}
+
+/* Modal overlay */
+#modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,28,43,.45);z-index:100;align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto}
+#modal-overlay.open{display:flex}
+#modal-overlay.fullscreen{padding:0;align-items:stretch}
+#modal-box{background:#fff;border-radius:var(--radius);width:100%;max-width:1160px;box-shadow:0 20px 60px rgba(0,0,0,.25);position:relative;margin:auto;display:flex;flex-direction:column}
+#modal-overlay.fullscreen #modal-box{max-width:100%;border-radius:0;height:100vh;margin:0}
+#modal-overlay.fullscreen .modal-split{flex:1;min-height:0}
+#modal-overlay.fullscreen .split-pane{overflow-y:auto}
+.modal-header{padding:18px 24px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.modal-header h2{font-size:1rem;font-weight:700;color:var(--text)}
+.modal-header .sub{font-size:.8rem;color:var(--muted);margin-top:2px}
+.modal-header-btns{display:flex;gap:4px;align-items:center}
+#modal-expand{background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted);line-height:1;padding:4px 7px;border-radius:6px}
+#modal-expand:hover{background:#f1f5f9;color:var(--text)}
+#modal-close{background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--muted);line-height:1;padding:4px 8px;border-radius:6px}
+#modal-close:hover{background:#f1f5f9;color:var(--text)}
+.modal-footer{padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0}
+
+/* Submit result banner (sits above the split) */
+#submit-result{display:none;padding:10px 24px;font-size:.87rem;border-bottom:1px solid transparent}
+#submit-result.success{background:var(--success-bg);border-color:#bbf7d0;color:var(--success)}
+#submit-result.error{background:var(--error-bg);border-color:#fecaca;color:var(--error)}
+
+/* Split layout */
+.modal-split{display:flex;flex:1;min-height:0;overflow:hidden}
+.split-pane{display:flex;flex-direction:column;gap:0;overflow-y:auto;padding:20px 22px}
+.split-left{flex:0 0 42%;border-right:1px solid var(--border);background:#f8fafc;max-height:78vh}
+.split-right{flex:1;max-height:78vh;display:flex;flex-direction:column;gap:12px}
+
+/* Pane header */
+.pane-header{display:flex;align-items:center;gap:8px;font-size:.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);flex-shrink:0}
+.pane-external{margin-left:auto;font-size:.78rem;font-weight:600;color:var(--brand-light);text-decoration:none;text-transform:none;letter-spacing:0}
+.pane-external:hover{text-decoration:underline}
+
+/* Jira read-only fields */
+.jira-field{display:flex;flex-direction:column;gap:3px;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--border)}
+.jira-field:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0;flex:1}
+.jira-meta-row{flex-direction:row;gap:16px}
+.jira-meta{display:flex;flex-direction:column;gap:3px;flex:1}
+.jf-label{font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.jf-value{font-size:.87rem;color:var(--text);line-height:1.5}
+.jf-desc{white-space:pre-wrap;font-size:.83rem;color:#475569;line-height:1.6;max-height:180px;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:6px;padding:8px 10px}
+.jf-transcript{white-space:pre-wrap;font-size:.78rem;color:#475569;line-height:1.6;max-height:140px;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-top:4px;font-family:inherit}
+
+/* ADO form inside right pane */
+.fg{display:flex;flex-direction:column;gap:5px}
+label{font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.req{color:var(--error);font-size:.85rem}
+input[type=text],select,textarea{padding:8px 12px;border:1.5px solid var(--border);border-radius:7px;font-size:.87rem;font-family:inherit;color:var(--text);background:#fff;transition:border-color .2s,box-shadow .2s;width:100%}
+input[type=text]:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand-light);box-shadow:0 0 0 3px rgba(30,111,212,.12)}
+textarea{resize:vertical;line-height:1.6}
+.ado-row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ado-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+
+/* Alerts */
+.alert{padding:12px 16px;border-radius:8px;font-size:.86rem;display:flex;gap:10px;align-items:flex-start}
+.alert-error{background:var(--error-bg);border:1px solid #fecaca;color:var(--error)}
+.alert-warn{background:var(--warn-bg);border:1px solid #fde68a;color:var(--warn)}
+.alert-info{background:var(--info-bg);border:1px solid #bfdbfe;color:var(--info)}
+
+/* Form validation & labels */
+.field-msg{font-size:.74rem;color:var(--error);margin-top:2px;display:none}
+.field-error{border-color:var(--error) !important;box-shadow:0 0 0 3px rgba(185,28,28,.08) !important}
+.val-banner{background:var(--warn-bg);border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:.84rem;color:#92400e;margin-bottom:10px}
+.lbl-hint{font-size:.68rem;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;margin-left:4px}
+.lbl-autodetect{font-size:.68rem;color:var(--success);font-weight:400;text-transform:none;letter-spacing:0;margin-left:4px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <img src="/static/ado-logo.png" alt="ADO"/>
+    Jira → ADO Bug Pipeline
+  </div>
+</header>
+
+<main>
+
+  <!-- ① Query card -->
+  <div class="card" id="query-card">
+    <div class="card-title"><span class="step-num">1</span> Jira Source</div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex-wrap:wrap">
+
+      <!-- Left: JQL filter info -->
+      <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:240px">
+        <span style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Active JQL Filter</span>
+        <code id="active-jql" style="font-size:.9rem;font-weight:600;color:var(--brand);background:#f0f4ff;padding:4px 10px;border-radius:6px;">loading…</code>
+        <span id="jira-status" style="font-size:.78rem;color:var(--muted)">corasystems.atlassian.net</span>
+      </div>
+
+      <!-- Right: Webhook config -->
+      <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:280px">
+        <span style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">🔗 Jira Webhook (auto-ingest new issues)</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <code id="webhook-url" style="flex:1;font-size:.78rem;color:var(--text);background:#f0f4ff;padding:4px 10px;border-radius:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">loading…</code>
+          <button onclick="copyWebhookUrl()" style="flex-shrink:0;padding:4px 10px;font-size:.75rem;font-weight:600;border:1.5px solid var(--border);border-radius:6px;cursor:pointer;background:#fff;color:var(--text)" title="Copy URL">📋 Copy</button>
+        </div>
+        <div style="font-size:.74rem;color:var(--muted);line-height:1.5">
+          Point Jira to this URL &rarr; <em>Project Settings &rarr; Webhooks &rarr; Issue Created</em>.
+          New issues matching your JQL will be ingested automatically.
+          <span id="webhook-last" style="display:inline-block;margin-left:6px"></span>
+        </div>
+      </div>
+
+    </div>
+    <div style="margin-top:14px;display:flex;justify-content:flex-end">
+      <button id="run-btn" onclick="runPipeline()">▶ Run Pipeline</button>
+    </div>
+    <div id="query-error" style="display:none;margin-top:12px"></div>
+  </div>
+
+  <!-- ② Progress card -->
+  <div class="card" id="progress-card">
+    <div class="card-title"><span class="step-num">2</span> Processing</div>
+    <div class="pbar-wrap"><div class="pbar" id="pbar" style="width:0%"></div></div>
+    <div class="pstatus">
+      <span id="pstatus-left"><span class="spinner"></span>Fetching Jira items…</span>
+      <span id="pstatus-right" style="color:var(--muted);font-size:.82rem"></span>
+    </div>
+  </div>
+
+  <!-- ③ Results card -->
+  <div class="card" id="results-card">
+    <div class="card-title"><span class="step-num">3</span> Results</div>
+
+    <div class="results-tabs">
+      <button class="tab-btn active" onclick="showTab('queue')">
+        ⏳ Ready for Review <span id="queue-count" style="background:#e0f2fe;color:#0369a1;border-radius:99px;padding:1px 8px;font-size:.78rem;margin-left:4px">0</span>
+      </button>
+      <button class="tab-btn" onclick="showTab('submitted')">
+        ✅ Submitted <span id="submitted-count" style="background:var(--success-bg);color:var(--success);border-radius:99px;padding:1px 8px;font-size:.78rem;margin-left:4px">0</span>
+      </button>
+      <button class="tab-btn" onclick="showTab('skipped')">
+        ⚠️ Needs More Info <span id="skip-count" style="background:#fef9c3;color:#854d0e;border-radius:99px;padding:1px 8px;font-size:.78rem;margin-left:4px">0</span>
+      </button>
+      <button class="tab-btn" onclick="showTab('errors')">
+        ❌ Errors <span id="error-count" style="background:#fee2e2;color:#991b1b;border-radius:99px;padding:1px 8px;font-size:.78rem;margin-left:4px">0</span>
+      </button>
+    </div>
+
+    <!-- Queue tab (pending items only) -->
+    <div id="tab-queue" class="tab-panel active">
+      <div class="filter-toolbar" id="filter-queue-toolbar" style="display:none">
+        <input type="text" id="filter-queue-search" placeholder="🔍 Search key or title…" oninput="renderTab('queue')">
+        <select id="filter-queue-video" onchange="renderTab('queue')">
+          <option value="all">📹 Video: All</option>
+          <option value="yes">Has Video</option>
+          <option value="no">No Video</option>
+        </select>
+        <select id="filter-queue-conf" onchange="renderTab('queue')">
+          <option value="all">Confidence: All</option>
+          <option value="high">High (80%+)</option>
+          <option value="med">Medium (50–79%)</option>
+          <option value="low">Low (&lt;50%)</option>
+        </select>
+        <button class="clear-filters" onclick="clearFilters('queue')">✕ Clear</button>
+        <span class="filter-count" id="filter-queue-count"></span>
+      </div>
+      <div id="queue-empty" class="empty-state" style="display:none">
+        <div class="icon">📭</div>
+        <p>No items pending review.</p>
+      </div>
+      <table class="results-table" id="queue-table" style="display:none">
+        <thead>
+          <tr>
+            <th class="sortable" onclick="sortTable('queue','key')">Jira Key</th>
+            <th class="sortable" onclick="sortTable('queue','title')">Jira Title</th>
+            <th class="sortable" onclick="sortTable('queue','adotitle')">ADO Bug Title</th>
+            <th class="sortable" onclick="sortTable('queue','video')">Has Video</th>
+            <th class="sortable" onclick="sortTable('queue','conf')">Confidence</th>
+            <th class="sortable" onclick="sortTable('queue','created')">Created</th>
+            <th class="sortable" onclick="sortTable('queue','updated')">Updated</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="queue-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Submitted tab -->
+    <div id="tab-submitted" class="tab-panel">
+      <div class="filter-toolbar" id="filter-submitted-toolbar" style="display:none">
+        <input type="text" id="filter-submitted-search" placeholder="🔍 Search key, title or bug #…" oninput="renderTab('submitted')">
+        <select id="filter-submitted-video" onchange="renderTab('submitted')">
+          <option value="all">📹 Video: All</option>
+          <option value="yes">Has Video</option>
+          <option value="no">No Video</option>
+        </select>
+        <select id="filter-submitted-conf" onchange="renderTab('submitted')">
+          <option value="all">Confidence: All</option>
+          <option value="high">High (80%+)</option>
+          <option value="med">Medium (50–79%)</option>
+          <option value="low">Low (&lt;50%)</option>
+        </select>
+        <button class="clear-filters" onclick="clearFilters('submitted')">✕ Clear</button>
+        <span class="filter-count" id="filter-submitted-count"></span>
+      </div>
+      <div id="submitted-empty" class="empty-state" style="display:none">
+        <div class="icon">📭</div>
+        <p>No bugs submitted yet.</p>
+      </div>
+      <table class="results-table" id="submitted-table" style="display:none">
+        <thead>
+          <tr>
+            <th class="sortable" onclick="sortTable('submitted','key')">Jira Key</th>
+            <th class="sortable" onclick="sortTable('submitted','title')">Jira Title</th>
+            <th class="sortable" onclick="sortTable('submitted','adotitle')">ADO Bug Title</th>
+            <th class="sortable" onclick="sortTable('submitted','video')">Has Video</th>
+            <th class="sortable" onclick="sortTable('submitted','conf')">Confidence</th>
+            <th class="sortable" onclick="sortTable('submitted','ado')">ADO Bug</th>
+            <th class="sortable" onclick="sortTable('submitted','created')">Created</th>
+            <th class="sortable" onclick="sortTable('submitted','updated')">Updated</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="submitted-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Skipped tab -->
+    <div id="tab-skipped" class="tab-panel">
+      <div class="filter-toolbar" id="filter-skipped-toolbar" style="display:none">
+        <input type="text" id="filter-skipped-search" placeholder="🔍 Search key, title or missing field…" oninput="renderTab('skipped')">
+        <select id="filter-skipped-video" onchange="renderTab('skipped')">
+          <option value="all">📹 Video: All</option>
+          <option value="yes">Has Video</option>
+          <option value="no">No Video</option>
+        </select>
+        <select id="filter-skipped-commented" onchange="renderTab('skipped')">
+          <option value="all">Comment: All</option>
+          <option value="yes">✓ Posted</option>
+          <option value="no">⚠ Failed</option>
+        </select>
+        <button class="clear-filters" onclick="clearFilters('skipped')">✕ Clear</button>
+        <span class="filter-count" id="filter-skipped-count"></span>
+      </div>
+      <div id="skipped-empty" class="empty-state" style="display:none">
+        <div class="icon">🎉</div>
+        <p>All items had sufficient information — nothing was skipped.</p>
+      </div>
+      <table class="results-table" id="skip-table" style="display:none">
+        <thead>
+          <tr>
+            <th class="sortable" onclick="sortTable('skipped','key')">Jira Key</th>
+            <th class="sortable" onclick="sortTable('skipped','title')">Title</th>
+            <th>Missing Info</th>
+            <th class="sortable" onclick="sortTable('skipped','commented')">Jira Comment</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="skip-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Errors tab -->
+    <div id="tab-errors" class="tab-panel">
+      <div id="errors-empty" class="empty-state">
+        <div class="icon">✅</div>
+        <p>No errors.</p>
+      </div>
+      <div id="errors-list" style="display:none;display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ── Review & Submit modal ── -->
+<div id="modal-overlay" onclick="closeModalOutside(event)">
+  <div id="modal-box">
+
+    <div class="modal-header">
+      <div>
+        <h2 id="modal-title">Review Bug Report</h2>
+        <div class="sub" id="modal-sub"></div>
+      </div>
+      <div class="modal-header-btns">
+        <button id="modal-expand" onclick="toggleModalFullscreen()" title="Expand / collapse">⛶</button>
+        <button id="modal-close" onclick="closeModal()">✕</button>
+      </div>
+    </div>
+
+    <div id="submit-result"></div>
+
+    <!-- Split body -->
+    <div class="modal-split">
+
+      <!-- ── LEFT: Jira ticket (read-only) ── -->
+      <div class="split-pane split-left">
+        <div class="pane-header">
+          <span class="pane-logo">🔵</span>
+          <span>Jira Ticket</span>
+          <a id="jira-link" href="#" target="_blank" class="pane-external">↗ Open</a>
+        </div>
+
+        <div class="jira-field">
+          <div class="jf-label">Summary</div>
+          <div class="jf-value" id="j-summary"></div>
+        </div>
+        <div class="jira-field jira-meta-row">
+          <div class="jira-meta">
+            <div class="jf-label">Status</div>
+            <div class="jf-value" id="j-status"></div>
+          </div>
+          <div class="jira-meta">
+            <div class="jf-label">Priority</div>
+            <div class="jf-value" id="j-priority"></div>
+          </div>
+          <div class="jira-meta">
+            <div class="jf-label">Issue Type</div>
+            <div class="jf-value" id="j-issuetype"></div>
+          </div>
+        </div>
+        <div class="jira-field jira-meta-row">
+          <div class="jira-meta">
+            <div class="jf-label">Reporter</div>
+            <div class="jf-value" id="j-reporter"></div>
+          </div>
+          <div class="jira-meta">
+            <div class="jf-label">Assignee</div>
+            <div class="jf-value" id="j-assignee"></div>
+          </div>
+        </div>
+        <div class="jira-field jira-meta-row">
+          <div class="jira-meta">
+            <div class="jf-label">Created</div>
+            <div class="jf-value" id="j-created"></div>
+          </div>
+          <div class="jira-meta">
+            <div class="jf-label">Last Updated</div>
+            <div class="jf-value" id="j-updated"></div>
+          </div>
+        </div>
+        <div class="jira-field" id="j-labels-row" style="display:none">
+          <div class="jf-label">Labels</div>
+          <div class="jf-value" id="j-labels"></div>
+        </div>
+        <div class="jira-field" id="j-video-row">
+          <div class="jf-label">Video Attachment</div>
+          <div class="jf-value" id="j-video"></div>
+        </div>
+        <div class="jira-field" style="flex:1">
+          <div class="jf-label">Description</div>
+          <div class="jf-value jf-desc" id="j-description"></div>
+        </div>
+        <div class="jira-field" id="j-transcript-wrap" style="display:none">
+          <div class="jf-label" style="cursor:pointer" onclick="toggleTranscript()">
+            Video Transcript <span id="t-toggle-icon">▼</span>
+          </div>
+          <pre class="jf-transcript" id="j-transcript" style="display:none"></pre>
+        </div>
+      </div>
+
+      <!-- ── RIGHT: ADO bug form (editable) ── -->
+      <div class="split-pane split-right">
+        <div class="pane-header">
+          <img src="/static/ado-logo.png" height="18" style="mix-blend-mode:multiply;opacity:.8"/>
+          <span>ADO Bug Report</span>
+        </div>
+
+        <!-- Files to be attached -->
+        <div id="attach-section" style="display:none;margin-bottom:4px">
+          <div class="attach-list-header">
+            <span class="label">📎 Files to be Attached to Bug</span>
+            <span class="sel-links">
+              <span onclick="toggleAllAttachments(true)">Select all</span>
+              <span onclick="toggleAllAttachments(false)">None</span>
+            </span>
+          </div>
+          <div id="attach-gallery"></div>
+        </div>
+
+        <div id="val-banner" class="val-banner" style="display:none"></div>
+
+        <div class="fg">
+          <label>Bug Title <span class="req">*</span></label>
+          <input type="text" id="f-title"/>
+          <span class="field-msg" id="e-title">Bug Title is required</span>
+        </div>
+
+        <div class="ado-row2">
+          <div class="fg">
+            <label>Severity <span class="req">*</span></label>
+            <select id="f-severity"><option value="">— Select project first —</option></select>
+            <span class="field-msg" id="e-severity">Severity is required</span>
+          </div>
+          <div class="fg">
+            <label>Customer Impact <span class="req">*</span></label>
+            <select id="f-customerimpact"><option value="">— Select project first —</option></select>
+            <span class="field-msg" id="e-customerimpact">Customer Impact is required</span>
+          </div>
+        </div>
+
+        <div class="fg">
+          <label>Steps to Reproduce <span class="req">*</span>
+            <span class="lbl-hint">Description · Steps · Expected Result · Actual Result</span>
+          </label>
+          <textarea id="f-repro" rows="11"
+            placeholder="Description:&#10;&#10;Steps to Reproduce:&#10;1. Navigate to...&#10;2. Click...&#10;&#10;Expected Result:&#10;&#10;Actual Result:"></textarea>
+          <span class="field-msg" id="e-repro">Steps to Reproduce is required</span>
+        </div>
+
+        <div class="fg">
+          <label>Acceptance Criteria <span class="req">*</span></label>
+          <textarea id="f-acceptance" rows="3"
+            placeholder="• The bug no longer occurs when…&#10;• The page loads correctly after…&#10;• Error message no longer appears"></textarea>
+          <span class="field-msg" id="e-acceptance">Acceptance Criteria is required</span>
+        </div>
+
+        <div class="ado-row2">
+          <div class="fg">
+            <label>Test Site <span class="req">*</span>
+              <span class="lbl-autodetect" id="build-testsite-label">📸 auto-detected</span>
+            </label>
+            <input type="text" id="f-testsite" placeholder="https://client.corasystems.com"
+                   oninput="validateTestSite()" onblur="onTestSiteChange()"/>
+            <span class="field-msg" id="e-testsite">Test Site is required</span>
+            <span id="warn-testsite" style="display:none;font-size:.74rem;color:#b45309;margin-top:2px">
+              ⚠ URL does not appear to be a Cora PPM site — please verify
+            </span>
+          </div>
+          <div class="fg">
+            <label>Product Area <span class="req">*</span></label>
+            <select id="f-productarea"><option value="">— Select project first —</option></select>
+            <span class="field-msg" id="e-productarea">Product Area is required</span>
+          </div>
+        </div>
+
+        <div class="ado-row2">
+          <div class="fg">
+            <label>Found In Build No <span class="req">*</span>
+              <span class="lbl-autodetect" id="build-autodetect-label"></span>
+            </label>
+            <input type="text" id="f-foundinbuild" placeholder="e.g. 24.3.1 or Sprint 42"/>
+            <span class="field-msg" id="e-foundinbuild">Found In Build is required</span>
+          </div>
+          <div class="fg">
+            <label>Tags</label>
+            <input type="text" id="f-tags" placeholder="Cora PPM, Dashboard…"/>
+          </div>
+        </div>
+
+        <div class="ado-row2">
+          <div class="fg">
+            <label>JIRA ID / UAT Log ID / Customer Ref</label>
+            <input type="text" id="f-jiraid" placeholder="e.g. PSUS-81"/>
+          </div>
+          <div class="fg">
+            <label>Primary Customer</label>
+            <select id="f-primarycustomer"><option value="">— Select project first —</option></select>
+          </div>
+        </div>
+
+        <div class="ado-row3">
+          <div class="fg">
+            <label>Project</label>
+            <input type="text" id="f-project" value="PPM" readonly
+                   style="background:#f0f4f8;color:var(--muted);cursor:not-allowed"/>
+          </div>
+          <div class="fg">
+            <label>Area Path</label>
+            <select id="f-area"><option value="">— Select area path —</option></select>
+          </div>
+          <div class="fg">
+            <label>Iteration Path</label>
+            <select id="f-iteration"><option value="">(none)</option></select>
+          </div>
+        </div>
+
+      </div><!-- /split-right -->
+    </div><!-- /modal-split -->
+
+    <div class="modal-footer">
+      <button class="action-btn" onclick="closeModal()">Cancel</button>
+      <button class="action-btn" id="save-draft-btn" onclick="saveDraft()" title="Save your edits without submitting to ADO">💾 Save Draft</button>
+      <span id="draft-saved-msg" style="font-size:.78rem;color:var(--success);align-self:center;display:none">✓ Saved</span>
+      <button class="action-btn primary" id="submit-btn" onclick="submitBug()">
+        <img src="/static/ado-logo.png" height="14" style="mix-blend-mode:screen;vertical-align:middle;margin-right:4px"/>
+        Submit to ADO
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentJobId = null;
+let pollInterval = null;
+let lastJobData  = null;
+
+// ── Load config + persistent queue on page start ──────────────
+(async function init() {
+  try {
+    const res  = await fetch('/api/config');
+    const data = await res.json();
+    document.getElementById('active-jql').textContent  = data.jql     || '(not set)';
+    document.getElementById('jira-status').textContent = data.jira_url || 'corasystems.atlassian.net';
+    if (data.webhook_url) {
+      document.getElementById('webhook-url').textContent = data.webhook_url;
+      document.getElementById('webhook-url').title       = data.webhook_url;
+    }
+  } catch(e) {
+    document.getElementById('active-jql').textContent = '(could not load)';
+  }
+  // Load webhook status indicator
+  await refreshWebhookStatus();
+  // Auto-load any previously processed items from SQLite
+  await loadPersistentQueue();
+  // Poll webhook status every 30 s so the "last received" badge stays fresh
+  setInterval(refreshWebhookStatus, 30_000);
+})();
+
+async function refreshWebhookStatus() {
+  try {
+    const res  = await fetch('/api/webhook/status');
+    const data = await res.json();
+    const el   = document.getElementById('webhook-last');
+    if (!el) return;
+    if (data.last_received) {
+      const ago = timeSince(data.last_received);
+      el.innerHTML = `<span style="color:var(--success);font-weight:600">● Last received: ${escHtml(data.last_key)} (${ago})</span>`;
+    } else {
+      el.innerHTML = '<span style="color:var(--muted)">No events received yet.</span>';
+    }
+  } catch(e) { /* silently ignore */ }
+}
+
+function copyWebhookUrl() {
+  const url = document.getElementById('webhook-url').textContent;
+  navigator.clipboard?.writeText(url).then(() => {
+    const btn = event.currentTarget;
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copied';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  });
+}
+
+function timeSince(isoTs) {
+  if (!isoTs) return '';
+  const secs = Math.floor((Date.now() - new Date(isoTs + 'Z').getTime()) / 1000);
+  if (secs < 60)   return `${secs}s ago`;
+  if (secs < 3600) return `${Math.floor(secs/60)}m ago`;
+  if (secs < 86400)return `${Math.floor(secs/3600)}h ago`;
+  return `${Math.floor(secs/86400)}d ago`;
+}
+
+async function loadPersistentQueue() {
+  try {
+    const res  = await fetch('/api/queue');
+    const data = await res.json();
+    // Merge into lastJobData so openModal can find items by key
+    lastJobData = {
+      status:  'done',
+      queue:   data.queue   || [],
+      skipped: data.skipped || [],
+      errors:  [],
+      cached_count: 0,
+    };
+    if (lastJobData.queue.length > 0 || lastJobData.skipped.length > 0) {
+      renderResults(lastJobData);
+    }
+  } catch(e) {
+    console.warn('Could not load persistent queue:', e);
+  }
+}
+
+// ── Pipeline control ─────────────────────────────────────────
+async function runPipeline() {
+  clearQueryError();
+  setRunBtn(false);
+  showProgress();
+
+  try {
+    const res = await fetch('/api/start-pipeline', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({})
+    });
+    const data = await res.json();
+    if (!res.ok) { throw new Error(data.error || 'Failed to start pipeline'); }
+
+    currentJobId = data.job_id;
+    pollInterval = setInterval(pollStatus, 1500);
+  } catch(e) {
+    showQueryError(e.message);
+    hideProgress();
+    setRunBtn(true);
+  }
+}
+
+async function pollStatus() {
+  if (!currentJobId) return;
+  try {
+    const res  = await fetch(`/api/job-status/${currentJobId}`);
+    const data = await res.json();
+
+    updateProgress(data);
+
+    if (data.status === 'done' || data.status === 'error') {
+      clearInterval(pollInterval);
+      pollInterval = null;
+      setRunBtn(true);
+      hideProgress();
+      // Reload the full persistent queue (includes newly processed + old items)
+      await loadPersistentQueue();
+    }
+  } catch(e) {
+    console.error('Poll error:', e);
+  }
+}
+
+// ── Progress ─────────────────────────────────────────────────
+function showProgress() {
+  document.getElementById('progress-card').style.display = 'block';
+}
+function hideProgress() {
+  document.getElementById('progress-card').style.display = 'none';
+}
+function updateProgress(data) {
+  const total     = data.total || 0;
+  const processed = data.processed || 0;
+  const cached    = data.cached_count || 0;
+  const pct = total > 0 ? Math.round((processed / total) * 100) : (data.status === 'running' ? 10 : 100);
+
+  document.getElementById('pbar').style.width = pct + '%';
+
+  let left = '', right = '';
+  if (data.status === 'running') {
+    const item = data.current_item ? ` — <strong>${data.current_item}</strong>` : '';
+    left = `<span class="spinner"></span>Processing${item}…`;
+    right = total > 0 ? `${processed} / ${total} new` : '';
+    if (cached > 0) right += ` &nbsp;·&nbsp; ${cached} already cached`;
+  } else if (data.status === 'done') {
+    const newStr  = total > 0  ? `${total} new item${total !== 1 ? 's' : ''} processed` : 'No new items';
+    const cachedStr = cached > 0 ? `, ${cached} already cached` : '';
+    left = `✅ Done! ${newStr}${cachedStr}`;
+  } else if (data.status === 'error') {
+    left = `❌ Error: ${data.error_message || 'Unknown error'}`;
+  }
+
+  document.getElementById('pstatus-left').innerHTML = left;
+  document.getElementById('pstatus-right').innerHTML = right;
+}
+
+// ── Sort / filter state ───────────────────────────────────────
+let rawQueue     = [];
+let rawSubmitted = [];
+let rawSkipped   = [];
+const sortState = {
+  queue:     { col: null, dir: 'asc' },
+  submitted: { col: null, dir: 'asc' },
+  skipped:   { col: null, dir: 'asc' },
+};
+
+function sortTable(tab, col) {
+  const s = sortState[tab];
+  s.dir = (s.col === col && s.dir === 'asc') ? 'desc' : 'asc';
+  s.col = col;
+  // Update th indicators
+  const tableId = tab === 'skipped' ? 'skip-table' : `${tab}-table`;
+  document.querySelectorAll(`#${tableId} th`).forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (th.onclick && th.onclick.toString().includes(`'${col}'`))
+      th.classList.add(`sort-${s.dir}`);
+  });
+  renderTab(tab);
+}
+
+function getFilterValues(tab) {
+  const p = tab;
+  return {
+    search:    (document.getElementById(`filter-${p}-search`)?.value      || '').toLowerCase().trim(),
+    video:      document.getElementById(`filter-${p}-video`)?.value       || 'all',
+    conf:       document.getElementById(`filter-${p}-conf`)?.value        || 'all',
+    commented:  document.getElementById(`filter-${p}-commented`)?.value   || 'all',
+  };
+}
+
+function applyFilterSort(arr, tab) {
+  const f = getFilterValues(tab);
+  const filtered = arr.filter(item => {
+    const text = [
+      item.jira_key, item.jira_title,
+      item.bug?.title || '',
+      ...(item.missing || []),
+      item.ado_work_item_id || '',
+    ].join(' ').toLowerCase();
+    if (f.search && !text.includes(f.search)) return false;
+    if (f.video !== 'all' && ((f.video === 'yes') !== !!item.has_video)) return false;
+    if (f.conf  !== 'all') {
+      const c = item.confidence || 0;
+      if (f.conf === 'high' && c < 80)  return false;
+      if (f.conf === 'med'  && (c < 50 || c >= 80)) return false;
+      if (f.conf === 'low'  && c >= 50) return false;
+    }
+    if (f.commented !== 'all' && ((f.commented === 'yes') !== !!item.commented)) return false;
+    return true;
+  });
+  const { col, dir } = sortState[tab];
+  if (!col) return filtered;
+  return [...filtered].sort((a, b) => {
+    let av, bv;
+    if      (col === 'key')       { av = a.jira_key || '';  bv = b.jira_key || ''; }
+    else if (col === 'title')     { av = a.jira_title || ''; bv = b.jira_title || ''; }
+    else if (col === 'video')     { av = a.has_video ? 1 : 0; bv = b.has_video ? 1 : 0; }
+    else if (col === 'conf')      { av = a.confidence || 0; bv = b.confidence || 0; }
+    else if (col === 'ado')       { av = parseInt(a.ado_work_item_id) || 0; bv = parseInt(b.ado_work_item_id) || 0; }
+    else if (col === 'commented') { av = a.commented ? 1 : 0; bv = b.commented ? 1 : 0; }
+    else if (col === 'adotitle')  { av = a.bug?.title || ''; bv = b.bug?.title || ''; }
+    else if (col === 'created')   { av = a.jira_fields?.created || ''; bv = b.jira_fields?.created || ''; }
+    else if (col === 'updated')   { av = a.jira_fields?.updated || ''; bv = b.jira_fields?.updated || ''; }
+    else return 0;
+    if (av < bv) return dir === 'asc' ? -1 : 1;
+    if (av > bv) return dir === 'asc' ?  1 : -1;
+    return 0;
+  });
+}
+
+function clearFilters(tab) {
+  const s = document.getElementById(`filter-${tab}-search`);
+  const v = document.getElementById(`filter-${tab}-video`);
+  const c = document.getElementById(`filter-${tab}-conf`);
+  const k = document.getElementById(`filter-${tab}-commented`);
+  if (s) s.value = '';
+  if (v) v.value = 'all';
+  if (c) c.value = 'all';
+  if (k) k.value = 'all';
+  renderTab(tab);
+}
+
+// ── Per-tab render functions ──────────────────────────────────
+function renderTab(tab) {
+  const raw = tab === 'queue' ? rawQueue : tab === 'submitted' ? rawSubmitted : rawSkipped;
+  const items = applyFilterSort(raw, tab);
+
+  // Filter toolbar visibility + count badge
+  const toolbar = document.getElementById(`filter-${tab}-toolbar`);
+  if (toolbar) toolbar.style.display = raw.length > 0 ? 'flex' : 'none';
+  const countEl = document.getElementById(`filter-${tab}-count`);
+  if (countEl) countEl.textContent = items.length < raw.length ? `${items.length} of ${raw.length}` : '';
+
+  if      (tab === 'queue')     renderQueueRows(items);
+  else if (tab === 'submitted') renderSubmittedRows(items);
+  else if (tab === 'skipped')   renderSkippedRows(items);
+}
+
+function renderQueueRows(items) {
+  const tbody = document.getElementById('queue-tbody');
+  tbody.innerHTML = '';
+  const empty = document.getElementById('queue-empty');
+  const table = document.getElementById('queue-table');
+  if (items.length === 0) { empty.style.display = 'block'; table.style.display = 'none'; return; }
+  empty.style.display = 'none'; table.style.display = 'table';
+  items.forEach(item => {
+    const conf = item.confidence || 0;
+    const key  = item.jira_key;
+    const tr = document.createElement('tr');
+    tr.id = `row-${key}`;
+    tr.innerHTML = `
+      <td class="jira-key">${item.jira_url ? `<a href="${item.jira_url}" target="_blank">${key}</a>` : key}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(item.jira_title)}">${escHtml(item.jira_title)}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:.83rem" title="${escHtml(item.bug?.title||'')}">${escHtml(item.bug?.title || '—')}</td>
+      <td>${item.has_video ? '<span class="badge badge-blue">📹 Yes</span>' : '<span class="badge badge-gray">—</span>'}</td>
+      <td><div class="conf-bar"><div class="conf-pip"><div class="conf-fill ${conf>=80?'high':conf>=50?'med':'low'}" style="width:${conf}%"></div></div><span style="font-size:.78rem;color:var(--muted)">${conf}%</span></div></td>
+      <td style="font-size:.78rem;color:var(--muted);white-space:nowrap">${fmtDateShort(item.jira_fields?.created)}</td>
+      <td style="font-size:.78rem;color:var(--muted);white-space:nowrap">${fmtDateShort(item.jira_fields?.updated)}</td>
+      <td style="white-space:nowrap;display:flex;gap:6px;flex-wrap:wrap">
+        <button class="action-btn primary" onclick="openModal('${key}')">Review &amp; Submit</button>
+        <button class="action-btn reprocess" id="reprocess-${key}" onclick="reprocessItem('${key}')">↺ Re-process</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderSubmittedRows(items) {
+  const tbody = document.getElementById('submitted-tbody');
+  tbody.innerHTML = '';
+  const empty = document.getElementById('submitted-empty');
+  const table = document.getElementById('submitted-table');
+  if (items.length === 0) { empty.style.display = 'block'; table.style.display = 'none'; return; }
+  empty.style.display = 'none'; table.style.display = 'table';
+  items.forEach(item => {
+    const conf = item.confidence || 0;
+    const key  = item.jira_key;
+    const adoLink = item.ado_url
+      ? `<a href="${item.ado_url}" target="_blank" style="color:var(--success);font-weight:700">Bug #${item.ado_work_item_id}</a>`
+      : `Bug #${item.ado_work_item_id || '?'}`;
+    const tr = document.createElement('tr');
+    tr.id = `row-${key}`;
+    tr.className = 'row-submitted';
+    tr.innerHTML = `
+      <td class="jira-key">${item.jira_url ? `<a href="${item.jira_url}" target="_blank">${key}</a>` : key}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(item.jira_title)}">${escHtml(item.jira_title)}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:.83rem" title="${escHtml(item.bug?.title||'')}">${escHtml(item.bug?.title || '—')}</td>
+      <td>${item.has_video ? '<span class="badge badge-blue">📹 Yes</span>' : '<span class="badge badge-gray">—</span>'}</td>
+      <td><div class="conf-bar"><div class="conf-pip"><div class="conf-fill ${conf>=80?'high':conf>=50?'med':'low'}" style="width:${conf}%"></div></div><span style="font-size:.78rem;color:var(--muted)">${conf}%</span></div></td>
+      <td>${adoLink}</td>
+      <td style="font-size:.78rem;color:var(--muted);white-space:nowrap">${fmtDateShort(item.jira_fields?.created)}</td>
+      <td style="font-size:.78rem;color:var(--muted);white-space:nowrap">${fmtDateShort(item.jira_fields?.updated)}</td>
+      <td><button class="action-btn reprocess" id="reprocess-${key}" onclick="reprocessItem('${key}')">↺ Re-process</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderSkippedRows(items) {
+  const tbody = document.getElementById('skip-tbody');
+  tbody.innerHTML = '';
+  const empty = document.getElementById('skipped-empty');
+  const table = document.getElementById('skip-table');
+  if (items.length === 0) { empty.style.display = 'block'; table.style.display = 'none'; return; }
+  empty.style.display = 'none'; table.style.display = 'table';
+  items.forEach(item => {
+    const key        = item.jira_key;
+    const keyHtml    = item.jira_url ? `<a href="${item.jira_url}" target="_blank">${key}</a>` : key;
+    const missingHtml = (item.missing || []).map(m => `<span class="missing-tag">${escHtml(m)}</span>`).join('');
+    const commentHtml = item.commented
+      ? '<span class="badge badge-green">✓ Posted</span>'
+      : '<span class="badge badge-warn">⚠ Failed</span>';
+    const tr = document.createElement('tr');
+    tr.id = `row-${key}`;
+    tr.innerHTML = `
+      <td class="jira-key">${keyHtml}</td>
+      <td>${escHtml(item.jira_title)}</td>
+      <td><div class="missing-tags">${missingHtml || '<span class="badge badge-gray">Unknown</span>'}</div></td>
+      <td>${commentHtml}</td>
+      <td><button class="action-btn reprocess" onclick="reprocessItem('${key}')">↺ Re-process</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ── Results rendering ─────────────────────────────────────────
+function renderResults(data) {
+  const allQueue = data.queue   || [];
+  const skipped  = data.skipped || [];
+  const errors   = data.errors  || [];
+
+  rawQueue     = allQueue.filter(i => !i.submitted);
+  rawSubmitted = allQueue.filter(i =>  i.submitted);
+  rawSkipped   = skipped;
+
+  document.getElementById('queue-count').textContent     = rawQueue.length;
+  document.getElementById('submitted-count').textContent = rawSubmitted.length;
+  document.getElementById('skip-count').textContent      = rawSkipped.length;
+  document.getElementById('error-count').textContent     = errors.length;
+
+  renderTab('queue');
+  renderTab('submitted');
+  renderTab('skipped');
+
+  // Errors tab (no sort/filter needed)
+  const errList = document.getElementById('errors-list');
+  if (errors.length === 0) {
+    document.getElementById('errors-empty').style.display = 'block';
+    errList.style.display = 'none';
+  } else {
+    document.getElementById('errors-empty').style.display = 'none';
+    errList.style.display = 'flex';
+    errList.innerHTML = '';
+    errors.forEach(e => {
+      errList.innerHTML += `<div class="alert alert-error"><strong>${escHtml(e.key || '?')}</strong> — ${escHtml(e.error || 'Unknown error')}</div>`;
+    });
+  }
+
+  document.getElementById('results-card').style.display = 'block';
+}
+
+// ── Re-process a single item ──────────────────────────────────
+async function reprocessItem(jiraKey) {
+  const btn = document.getElementById(`reprocess-${jiraKey}`);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Processing…'; }
+
+  try {
+    const res  = await fetch(`/api/queue/reprocess/${encodeURIComponent(jiraKey)}`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Reprocess failed');
+
+    // Poll until this mini-job completes, then reload the full queue
+    const jobId = data.job_id;
+    const poll = setInterval(async () => {
+      try {
+        const sr   = await fetch(`/api/job-status/${jobId}`);
+        const sdata = await sr.json();
+        if (sdata.status === 'done' || sdata.status === 'error') {
+          clearInterval(poll);
+          if (sdata.status === 'error') {
+            alert(`Re-process failed for ${jiraKey}: ${sdata.error_message || 'Unknown error'}`);
+          }
+          await loadPersistentQueue();
+        }
+      } catch(e) { clearInterval(poll); }
+    }, 1500);
+
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = '↺ Re-process'; }
+    alert(`Could not start re-process: ${e.message}`);
+  }
+}
+
+// ── Tabs ──────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    const names = ['queue','submitted','skipped','errors'];
+    b.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ── Attach list helpers ────────────────────────────────────────
+
+// Browsers block window.open() on raw data URIs — convert to a Blob URL first
+function openDataUri(dataUri) {
+  try {
+    const [meta, b64] = dataUri.split(',');
+    const mime = meta.match(/:(.*?);/)[1];
+    const bin  = atob(b64);
+    const arr  = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    const blob = new Blob([arr], { type: mime });
+    const url  = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+  } catch(e) {
+    console.warn('openDataUri failed:', e);
+  }
+}
+
+function fileIcon(filename) {
+  const ext = (filename || '').split('.').pop().toLowerCase();
+  const map = { xlsx:'📊', xls:'📊', csv:'📊', pdf:'📄', docx:'📝', doc:'📝',
+                pptx:'📊', ppt:'📊', png:'🖼️', jpg:'🖼️', jpeg:'🖼️', gif:'🖼️',
+                zip:'🗜️', rar:'🗜️', '7z':'🗜️', txt:'📃', mp4:'🎬', mov:'🎬', avi:'🎬' };
+  return map[ext] || '📎';
+}
+
+function makeAttachRow(label, icon, meta, openFn) {
+  const key = label;   // used as the excludedAttachments key
+  const row = document.createElement('div');
+  row.className = 'attach-row';
+  row.dataset.filename = key;
+
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.checked = true;
+  cb.addEventListener('change', () => {
+    if (cb.checked) {
+      excludedAttachments.delete(key);
+      row.classList.remove('excluded');
+    } else {
+      excludedAttachments.add(key);
+      row.classList.add('excluded');
+    }
+  });
+
+  const iconEl = document.createElement('span');
+  iconEl.className = 'attach-row-icon';
+  iconEl.textContent = icon;
+
+  const nameEl = document.createElement('span');
+  nameEl.className = 'attach-row-name';
+  nameEl.textContent = label;
+  nameEl.title = label;
+
+  const metaEl = document.createElement('span');
+  metaEl.className = 'attach-row-meta';
+  metaEl.textContent = meta;
+
+  const openBtn = document.createElement('button');
+  openBtn.className = 'attach-row-open';
+  openBtn.type = 'button';
+  openBtn.title = 'Open / preview';
+  openBtn.textContent = '↗';
+  openBtn.addEventListener('click', e => { e.stopPropagation(); openFn(); });
+
+  // Clicking anywhere on the row (except the open button) toggles checkbox
+  row.addEventListener('click', e => {
+    if (e.target === openBtn) return;
+    cb.checked = !cb.checked;
+    cb.dispatchEvent(new Event('change'));
+  });
+
+  row.appendChild(cb);
+  row.appendChild(iconEl);
+  row.appendChild(nameEl);
+  row.appendChild(metaEl);
+  row.appendChild(openBtn);
+  return row;
+}
+
+function toggleAllAttachments(include) {
+  document.querySelectorAll('#attach-gallery .attach-row').forEach(row => {
+    const cb  = row.querySelector('input[type=checkbox]');
+    const key = row.dataset.filename;
+    if (!cb) return;
+    cb.checked = include;
+    if (include) {
+      excludedAttachments.delete(key);
+      row.classList.remove('excluded');
+    } else {
+      if (key) excludedAttachments.add(key);
+      row.classList.add('excluded');
+    }
+  });
+}
+
+// ── Modal fullscreen toggle ────────────────────────────────────
+function toggleModalFullscreen() {
+  const overlay = document.getElementById('modal-overlay');
+  const btn     = document.getElementById('modal-expand');
+  const isFS    = overlay.classList.toggle('fullscreen');
+  btn.textContent = isFS ? '⤡' : '⛶';
+  btn.title       = isFS ? 'Exit full screen' : 'Full screen';
+  // Keep overlay scroll position tidy on expand
+  if (isFS) overlay.scrollTop = 0;
+}
+
+// ── Modal ─────────────────────────────────────────────────────
+let activeItemIdx       = null;
+let excludedAttachments = new Set();   // filenames excluded from the current modal session
+
+async function openModal(jiraKey) {
+  const item = (lastJobData?.queue || []).find(i => i.jira_key === jiraKey);
+  if (!item) return;
+  activeItemIdx = jiraKey;
+
+  // Lazy-load screenshots if not already fetched for this item
+  if (!item._screenshotsFetched) {
+    item.screenshots = [];
+    item._screenshotsFetched = false;
+    try {
+      const r = await fetch(`/api/queue/${encodeURIComponent(jiraKey)}/screenshots`);
+      const d = await r.json();
+      item.screenshots       = d.screenshots || [];
+      item._screenshotsFetched = true;
+    } catch(e) {
+      console.warn('Could not load screenshots for', jiraKey, e);
+    }
+  }
+
+  document.getElementById('modal-title').textContent = `Review — ${item.jira_key}`;
+  document.getElementById('modal-sub').textContent   = item.jira_title;
+
+  // ── Left pane: Jira fields (all read-only div/pre — no inputs) ──
+  const jf = item.jira_fields || {};
+  document.getElementById('j-summary').textContent     = jf.summary    || item.jira_title || '—';
+  document.getElementById('j-status').textContent      = jf.status     || '—';
+  document.getElementById('j-priority').textContent    = jf.priority   || '—';
+  document.getElementById('j-issuetype').textContent   = jf.issuetype  || '—';
+  document.getElementById('j-reporter').textContent    = jf.reporter   || '—';
+  document.getElementById('j-assignee').textContent    = jf.assignee   || 'Unassigned';
+  document.getElementById('j-created').textContent     = fmtJiraDate(jf.created);
+  document.getElementById('j-updated').textContent     = fmtJiraDate(jf.updated);
+  document.getElementById('j-description').textContent = jf.description || '(no description)';
+  document.getElementById('j-video').textContent       = jf.has_video ? '✅ Yes' : '— None';
+
+  const labels = jf.labels || [];
+  if (labels.length) {
+    document.getElementById('j-labels').textContent = labels.join(', ');
+    document.getElementById('j-labels-row').style.display = 'flex';
+  } else {
+    document.getElementById('j-labels-row').style.display = 'none';
+  }
+
+  if (jf.transcript) {
+    document.getElementById('j-transcript').textContent = jf.transcript;
+    document.getElementById('j-transcript-wrap').style.display = 'flex';
+    document.getElementById('j-transcript').style.display = 'none';
+    document.getElementById('t-toggle-icon').textContent = '▼';
+  } else {
+    document.getElementById('j-transcript-wrap').style.display = 'none';
+  }
+
+  if (item.jira_url) {
+    const link = document.getElementById('jira-link');
+    link.href = item.jira_url;
+    link.textContent = `↗ ${item.jira_key}`;
+  }
+
+  // ── Right pane: Files to be Attached ──
+  excludedAttachments = new Set();   // reset exclusions each time modal opens
+  const gallery = document.getElementById('attach-gallery');
+  const section = document.getElementById('attach-section');
+  gallery.innerHTML = '';
+
+  // ① Extra-video warning at top
+  if ((item.extra_video_count || 0) > 0) {
+    const warn = document.createElement('div');
+    warn.className = 'attach-extra-video';
+    const n = item.extra_video_count;
+    warn.innerHTML = `⚠️ ${n} additional video${n > 1 ? 's were' : ' was'} not transcribed. `
+      + `<a href="${escHtml(item.jira_url || '#')}" target="_blank" style="color:#92400e;font-weight:700">Review in Jira ↗</a>`;
+    gallery.appendChild(warn);
+  }
+
+  // ② Build list rows for video, other attachments, and screenshots
+  const jiraFallback = item.jira_url || '#';
+
+  if (item.video_filename) {
+    gallery.appendChild(makeAttachRow(
+      item.video_filename,
+      '🎬',
+      `${fmtBytes(item.video_size || 0)} · Screen recording`,
+      () => window.open(jiraFallback, '_blank')
+    ));
+  }
+
+  (item.other_attachments || []).forEach(att => {
+    gallery.appendChild(makeAttachRow(
+      att.filename,
+      fileIcon(att.filename),
+      fmtBytes(att.size || 0),
+      () => window.open(jiraFallback, '_blank')
+    ));
+  });
+
+  (item.screenshots || []).forEach((s, i) => {
+    gallery.appendChild(makeAttachRow(
+      `Screenshot · ${s.timestamp_sec}s`,
+      '🖼️',
+      `Frame at ${s.timestamp_sec}s`,
+      () => openDataUri(s.data_uri),
+      true   // isScreenshot — use data_uri key instead of filename in excludedAttachments
+    ));
+  });
+
+  const hasContent = item.video_filename
+    || (item.extra_video_count || 0) > 0
+    || (item.other_attachments || []).length > 0
+    || (item.screenshots || []).length > 0;
+  section.style.display = hasContent ? 'block' : 'none';
+
+  // ── Right pane: populate ADO form ──
+  const b = item.bug || {};
+
+  // Combine description + repro + expected + actual into one textarea
+  const combined = [
+    'Description:',
+    b.description || '',
+    '',
+    'Steps to Reproduce:',
+    b.repro_steps || '',
+    '',
+    'Expected Result:',
+    b.expected_result || '',
+    '',
+    'Actual Result:',
+    b.actual_result || '',
+  ].join('\n');
+
+  setValue('f-title',       b.title               || '');
+  // If user previously saved a draft, restore their edited repro content
+  setValue('f-repro',       b.repro_combined || combined);
+  setValue('f-acceptance',  b.acceptance_criteria || '');
+  // Construct fullUrl exactly as the original app does (base + path)
+  const urlBase = (b.test_site || '').replace(/\/$/, '');
+  const fullUrl = urlBase && b.url_path ? urlBase + b.url_path : (b.test_site || '');
+  setValue('f-testsite',    fullUrl);
+  validateTestSite();
+
+  setValue('f-foundinbuild',b.found_in_build      || '');
+  setValue('f-tags',        b.tags                || 'Cora PPM');
+  setValue('f-jiraid',      item.jira_key         || '');
+
+  // Auto-detect build from the live site — only if Claude didn't already extract one
+  if (fullUrl && !b.found_in_build) {
+    fetchCoraVersion(fullUrl);
+  }
+
+  // Load ADO dropdowns, then try to match Claude's suggestions
+  loadDropdowns('PPM', b);
+
+  clearValidation();
+  hideSubmitResult();
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = false;
+  btn.innerHTML = '<img src="/static/ado-logo.png" height="14" style="mix-blend-mode:screen;vertical-align:middle;margin-right:4px"/> Submit to ADO';
+
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+// ── Load ADO dropdowns ────────────────────────────────────────
+async function loadDropdowns(project, suggestedBug) {
+  const b   = suggestedBug || {};
+  const enc = encodeURIComponent;
+
+  const areaSel       = document.getElementById('f-area');
+  const iterSel       = document.getElementById('f-iteration');
+  const severitySel   = document.getElementById('f-severity');
+  const impactSel     = document.getElementById('f-customerimpact');
+  const productSel    = document.getElementById('f-productarea');
+  const customerSel   = document.getElementById('f-primarycustomer');
+
+  areaSel.innerHTML     = '<option value="">Loading…</option>';
+  iterSel.innerHTML     = '<option value="">Loading…</option>';
+  severitySel.innerHTML = '<option value="">Loading…</option>';
+  impactSel.innerHTML   = '<option value="">Loading…</option>';
+  productSel.innerHTML  = '<option value="">Loading…</option>';
+  customerSel.innerHTML = '<option value="">Loading…</option>';
+
+  try {
+    const [areaRes, iterRes, custRes, impactRes, productAreaRes, severityRes] = await Promise.all([
+      fetch(`/api/ado/area-paths?project=${enc(project)}`),
+      fetch(`/api/ado/iterations?project=${enc(project)}`),
+      fetch(`/api/ado/field-picklist?project=${enc(project)}&field=Custom.Customer`),
+      fetch(`/api/ado/field-picklist?project=${enc(project)}&field=Custom.CustomerImpact`),
+      fetch(`/api/ado/field-picklist?project=${enc(project)}&field=Custom.ProductArea`),
+      fetch(`/api/ado/field-picklist?project=${enc(project)}&field=Microsoft.VSTS.Common.Severity`),
+    ]);
+
+    const areaData        = await areaRes.json();
+    const iterData        = await iterRes.json();
+    const custData        = await custRes.json();
+    const impactData      = await impactRes.json();
+    const productAreaData = await productAreaRes.json();
+    const severityData    = await severityRes.json();
+
+    // Area paths
+    if (areaData.area_paths) {
+      areaSel.innerHTML = '<option value="">— Select area path —</option>' +
+        areaData.area_paths.map(p => `<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('');
+      if (b.area_path) tryMatchOption(areaSel, b.area_path);
+    } else {
+      areaSel.innerHTML = `<option value="">⚠ ${areaData.error || 'Failed to load'}</option>`;
+    }
+
+    // Iteration paths
+    if (iterData.iterations) {
+      iterSel.innerHTML = '<option value="">(none)</option>' +
+        iterData.iterations.map(p => `<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('');
+      if (b.iteration_path) tryMatchOption(iterSel, b.iteration_path);
+    } else {
+      iterSel.innerHTML = '<option value="">(none)</option>';
+    }
+
+    // Severity
+    if (severityData.values && severityData.values.length > 0) {
+      severitySel.innerHTML = '<option value="">— Select —</option>' +
+        severityData.values.map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join('');
+      if (b.severity) tryMatchOption(severitySel, b.severity);
+      else tryMatchOption(severitySel, '3 - Medium');
+    } else {
+      severitySel.innerHTML = `<option value="">⚠ Not available</option>`;
+    }
+
+    // Customer Impact
+    if (impactData.values && impactData.values.length > 0) {
+      impactSel.innerHTML = '<option value="">— Select —</option>' +
+        impactData.values.map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join('');
+      if (b.customer_impact) tryMatchOption(impactSel, b.customer_impact);
+    } else {
+      impactSel.innerHTML = `<option value="">⚠ Not available</option>`;
+    }
+
+    // Product Area
+    if (productAreaData.values && productAreaData.values.length > 0) {
+      productSel.innerHTML = '<option value="">— Select —</option>' +
+        productAreaData.values.map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join('');
+      if (b.product_area) tryMatchOption(productSel, b.product_area);
+    } else {
+      productSel.innerHTML = `<option value="">⚠ Not available</option>`;
+    }
+
+    // Primary Customer
+    if (custData.values && custData.values.length > 0) {
+      customerSel.innerHTML = '<option value="">— Select —</option>' +
+        custData.values.map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join('');
+      if (b.primary_customer) tryMatchOption(customerSel, b.primary_customer);
+    } else {
+      customerSel.innerHTML = `<option value="">⚠ Not available</option>`;
+    }
+
+  } catch (err) {
+    console.error('loadDropdowns error:', err);
+  }
+}
+
+function tryMatchOption(sel, suggestion) {
+  if (!suggestion) return;
+  const lower = suggestion.toLowerCase();
+  for (const opt of sel.options) {
+    if (opt.value && (opt.value.toLowerCase().includes(lower) || lower.includes(opt.value.toLowerCase()))) {
+      opt.selected = true; return;
+    }
+  }
+}
+
+// ── Validation ────────────────────────────────────────────────
+const REQUIRED = [
+  { id: 'f-title',          err: 'e-title',          label: 'Bug Title' },
+  { id: 'f-repro',          err: 'e-repro',          label: 'Steps to Reproduce' },
+  { id: 'f-acceptance',     err: 'e-acceptance',     label: 'Acceptance Criteria' },
+  { id: 'f-severity',       err: 'e-severity',       label: 'Severity' },
+  { id: 'f-customerimpact', err: 'e-customerimpact', label: 'Customer Impact' },
+  { id: 'f-testsite',       err: 'e-testsite',       label: 'Test Site' },
+  { id: 'f-productarea',    err: 'e-productarea',    label: 'Product Area' },
+  { id: 'f-foundinbuild',   err: 'e-foundinbuild',   label: 'Found In Build No' },
+];
+
+function validate() {
+  clearValidation();
+  const missing = [];
+  for (const f of REQUIRED) {
+    const val = document.getElementById(f.id).value.trim();
+    if (!val) {
+      document.getElementById(f.id).classList.add('field-error');
+      document.getElementById(f.err).style.display = 'block';
+      missing.push(f.label);
+    }
+  }
+  if (missing.length) {
+    const banner = document.getElementById('val-banner');
+    banner.textContent = `⚠ Please complete required fields: ${missing.join(', ')}`;
+    banner.style.display = 'block';
+    banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    return false;
+  }
+  return true;
+}
+
+function clearValidation() {
+  const banner = document.getElementById('val-banner');
+  if (banner) banner.style.display = 'none';
+  REQUIRED.forEach(f => {
+    const el = document.getElementById(f.id);
+    if (el) el.classList.remove('field-error');
+    const errEl = document.getElementById(f.err);
+    if (errEl) errEl.style.display = 'none';
+  });
+}
+
+// ── Test site validation ──────────────────────────────────────
+function validateTestSite() {
+  const val  = document.getElementById('f-testsite').value.trim();
+  const warn = document.getElementById('warn-testsite');
+  if (warn) warn.style.display = (val && !val.toLowerCase().includes('corasystems.com')) ? 'block' : 'none';
+}
+
+// Called on blur — triggers version auto-detect whenever user types/pastes a URL
+function onTestSiteChange() {
+  const url   = document.getElementById('f-testsite').value.trim();
+  const label = document.getElementById('build-autodetect-label');
+  if (!url) return;
+  // Clear the previous auto-detected label (but keep any manually entered build)
+  if (label && label.textContent === '🔍 auto-detected') {
+    label.textContent = '';
+    document.getElementById('f-foundinbuild').value = '';
+  }
+  fetchCoraVersion(url);
+}
+
+// ── Cora PPM version auto-detect ─────────────────────────────
+async function fetchCoraVersion(url) {
+  if (!url) return;
+  try {
+    const res  = await fetch('/fetch-version?url=' + encodeURIComponent(url));
+    const data = await res.json();
+    if (data.version) {
+      const field = document.getElementById('f-foundinbuild');
+      if (!field.value) {
+        field.value = data.version;
+        document.getElementById('build-autodetect-label').textContent = '🔍 auto-detected';
+      }
+    }
+  } catch (e) {
+    // Silently ignore version fetch failures
+  }
+}
+
+function toggleTranscript() {
+  const box  = document.getElementById('j-transcript');
+  const icon = document.getElementById('t-toggle-icon');
+  const show = box.style.display === 'none';
+  box.style.display  = show ? 'block' : 'none';
+  icon.textContent   = show ? '▲' : '▼';
+}
+
+function closeModal() {
+  const overlay = document.getElementById('modal-overlay');
+  overlay.classList.remove('open', 'fullscreen');
+  const btn = document.getElementById('modal-expand');
+  if (btn) { btn.textContent = '⛶'; btn.title = 'Full screen'; }
+  activeItemIdx = null;
+}
+
+function closeModalOutside(e) {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+}
+
+async function submitBug() {
+  // Run validation first
+  if (!validate()) return;
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Submitting to Azure DevOps…';
+  hideSubmitResult();
+
+  // Flat payload — matches what /api/submit-bug and submit_bug_to_ado() expect
+  // Also include jira_key so the backend can mark it as submitted in SQLite
+  const payload = {
+    project:             getValue('f-project')       || 'PPM',
+    title:               getValue('f-title'),
+    repro_steps:         getValue('f-repro'),
+    acceptance_criteria: getValue('f-acceptance'),
+    severity:            getValue('f-severity'),
+    customer_impact:     getValue('f-customerimpact'),
+    test_site:           getValue('f-testsite'),
+    product_area:        getValue('f-productarea'),
+    found_in_build:      getValue('f-foundinbuild'),
+    tags:                getValue('f-tags'),
+    jira_id:              getValue('f-jiraid'),
+    jira_key:             activeItemIdx || '',   // for DB tracking
+    primary_customer:     getValue('f-primarycustomer'),
+    area_path:            getValue('f-area'),
+    iteration_path:       getValue('f-iteration'),
+    excluded_attachments: [...excludedAttachments],   // filenames user chose to omit
+  };
+
+  try {
+    const res  = await fetch('/api/submit-bug', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || 'Submission failed');
+
+    const link = data.url
+      ? `<a href="${data.url}" target="_blank" style="color:var(--success);font-weight:700">Bug #${data.id}</a>`
+      : `Bug #${data.id}`;
+    showSubmitResult('success', `✅ ${link} created in Azure DevOps!`);
+    btn.innerHTML = '✅ Submitted!';
+
+    // Reload the full queue so the item moves to the Submitted tab
+    await loadPersistentQueue();
+
+  } catch(e) {
+    showSubmitResult('error', '❌ ' + e.message);
+    btn.disabled = false;
+    btn.innerHTML = '<img src="/static/ado-logo.png" height="14" style="mix-blend-mode:screen;vertical-align:middle;margin-right:4px"/> Submit to ADO';
+  }
+}
+
+// ── Save Draft ────────────────────────────────────────────────
+async function saveDraft() {
+  if (!activeItemIdx) return;
+  const btn = document.getElementById('save-draft-btn');
+  const msg = document.getElementById('draft-saved-msg');
+  btn.disabled = true;
+
+  const draft = {
+    title:               getValue('f-title'),
+    repro_combined:      getValue('f-repro'),
+    acceptance_criteria: getValue('f-acceptance'),
+    severity:            getValue('f-severity'),
+    customer_impact:     getValue('f-customerimpact'),
+    test_site:           getValue('f-testsite'),
+    product_area:        getValue('f-productarea'),
+    found_in_build:      getValue('f-foundinbuild'),
+    tags:                getValue('f-tags'),
+    primary_customer:    getValue('f-primarycustomer'),
+    area_path:           getValue('f-area'),
+    iteration_path:      getValue('f-iteration'),
+  };
+
+  try {
+    const res = await fetch(`/api/queue/${encodeURIComponent(activeItemIdx)}/save-draft`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ bug: draft }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Save failed');
+
+    // Update the in-memory item so re-opening the modal shows the latest draft
+    const item = (lastJobData?.queue || []).find(i => i.jira_key === activeItemIdx);
+    if (item) Object.assign(item.bug, draft);
+
+    msg.style.display = 'inline';
+    setTimeout(() => { msg.style.display = 'none'; }, 2500);
+  } catch(e) {
+    alert('Could not save draft: ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Utilities ─────────────────────────────────────────────────
+function getValue(id) { return document.getElementById(id)?.value || ''; }
+function setValue(id, v) { const el = document.getElementById(id); if(el) el.value = v; }
+function fmtBytes(b) {
+  if (!b) return '—';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  return (b / 1048576).toFixed(1) + ' MB';
+}
+function fmtJiraDate(iso) {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+  } catch(e) { return iso; }
+}
+function fmtDateShort(iso) {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleDateString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric'
+    });
+  } catch(e) { return iso; }
+}
+function setSelect(id, v) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  for (const opt of el.options) {
+    if (opt.value.toLowerCase() === v.toLowerCase()) { opt.selected = true; return; }
+  }
+}
+function showQueryError(msg) {
+  const el = document.getElementById('query-error');
+  el.innerHTML = `<div class="alert alert-error">⚠ ${escHtml(msg)}</div>`;
+  el.style.display = 'block';
+}
+function clearQueryError() {
+  document.getElementById('query-error').style.display = 'none';
+}
+function showSubmitResult(type, html) {
+  const el = document.getElementById('submit-result');
+  el.className = type;
+  el.innerHTML = html;
+  el.style.display = 'block';
+}
+function hideSubmitResult() {
+  document.getElementById('submit-result').style.display = 'none';
+}
+function setRunBtn(enabled) {
+  const btn = document.getElementById('run-btn');
+  btn.disabled = !enabled;
+  btn.textContent = enabled ? '▶ Run Pipeline' : '⏳ Running…';
+}
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// keyboard shortcut: Escape closes modal
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+});
+</script>
+</body>
+</html>

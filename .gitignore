@@ -1,0 +1,24 @@
+# Environment / secrets
+.env
+
+# Database (persisted separately on Railway volume)
+*.db
+*.db-shm
+*.db-wal
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Windows
+start.bat
