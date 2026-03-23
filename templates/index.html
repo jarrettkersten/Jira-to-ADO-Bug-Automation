@@ -14,13 +14,13 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
-header{background:var(--brand);color:#fff;padding:0 36px;height:58px;display:flex;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,.2)}
+header{background:var(--brand);color:#fff;padding:0 20px;height:46px;display:flex;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,.2)}
 .logo{display:flex;align-items:center;gap:14px;font-size:1rem;font-weight:600;letter-spacing:.01em}
 .logo img{height:28px;opacity:.9}
-main{max-width:1280px;margin:36px auto;padding:0 24px;display:flex;flex-direction:column;gap:20px}
+main{width:100%;margin:0;padding:16px 20px;display:flex;flex-direction:column;gap:16px;box-sizing:border-box}
 
-.card{background:var(--card);border-radius:var(--radius);padding:28px 32px;box-shadow:var(--shadow)}
-.card-title{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:20px;display:flex;align-items:center;gap:10px}
+.card{background:var(--card);border-radius:var(--radius);padding:18px 24px;box-shadow:var(--shadow)}
+.card-title{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:10px}
 .step-num{background:var(--brand);color:#fff;border-radius:50%;width:24px;height:24px;font-size:.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 
 /* About modal */
@@ -45,31 +45,23 @@ main{max-width:1280px;margin:36px auto;padding:0 24px;display:flex;flex-directio
 
 /* Table */
 .table-scroll-wrap{overflow-x:auto;width:100%}
-.results-table{width:100%;min-width:800px;border-collapse:collapse;font-size:.87rem;table-layout:fixed}
-.results-table th{text-align:left;padding:8px 12px;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.results-table{width:100%;border-collapse:collapse;font-size:.87rem;table-layout:auto}
+.results-table th{text-align:left;padding:8px 12px;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+.results-table thead tr:last-child th{border-bottom:2px solid var(--border)}
 .results-table th.sortable{cursor:pointer;user-select:none}
 .results-table th.sortable:hover{color:var(--brand);background:#f8fafc}
 .results-table th.sort-asc::after{content:' ▲';font-size:.6rem;color:var(--brand)}
 .results-table th.sort-desc::after{content:' ▼';font-size:.6rem;color:var(--brand)}
-.results-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.results-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap}
 .results-table tr:last-child td{border-bottom:none}
 .results-table tr:hover td{background:#f8fafc}
-.results-table .col-key{width:90px}
-.results-table .col-title{width:19%}
-.results-table .col-adotitle{width:22%}
-.results-table .col-video{width:68px;text-align:center}
-.results-table .col-conf{width:110px}
-.results-table .col-ado{width:90px}
-.results-table .col-date{width:90px}
-.results-table .col-submit{width:125px}
-.results-table .col-reprocess{width:100px}
-/* Column filter row */
-.filter-row th{padding:4px 6px;background:#f8fafc;border-bottom:2px solid var(--border)}
-.filter-row input[type=text]{width:100%;box-sizing:border-box;padding:4px 7px;border:1px solid var(--border);border-radius:5px;font-size:.78rem;color:var(--text);outline:none;background:#fff}
+/* Column filter row — sits ABOVE the header row */
+.filter-row th{padding:6px 6px 4px;background:#f8fafc;border-bottom:1px solid var(--border)}
+.filter-row input[type=text]{width:100%;min-width:120px;box-sizing:border-box;padding:4px 7px;border:1px solid var(--border);border-radius:5px;font-size:.78rem;color:var(--text);outline:none;background:#fff}
 .filter-row input[type=text]:focus{border-color:var(--brand-light);box-shadow:0 0 0 2px rgba(30,111,212,.1)}
-.filter-row select{width:100%;box-sizing:border-box;padding:4px 5px;border:1px solid var(--border);border-radius:5px;font-size:.78rem;background:#fff;cursor:pointer;color:var(--text);outline:none}
+.filter-row select{width:100%;min-width:80px;box-sizing:border-box;padding:4px 5px;border:1px solid var(--border);border-radius:5px;font-size:.78rem;background:#fff;cursor:pointer;color:var(--text);outline:none}
 .filter-row select:focus{border-color:var(--brand-light)}
-.filter-row .clear-filters{font-size:.72rem;color:var(--muted);background:none;border:1px solid var(--border);cursor:pointer;padding:3px 8px;border-radius:4px;white-space:nowrap;width:100%}
+.filter-row .clear-filters{font-size:.72rem;color:var(--muted);background:none;border:1px solid var(--border);cursor:pointer;padding:4px 10px;border-radius:4px;white-space:nowrap;width:100%}
 .filter-row .clear-filters:hover{color:var(--error);border-color:var(--error);background:#fff5f5}
 .filter-count{font-size:.72rem;color:var(--muted);display:block;margin-top:3px;white-space:nowrap}
 /* Column resize handle */
@@ -233,33 +225,28 @@ textarea{resize:vertical;line-height:1.6}
       </div>
       <div class="table-scroll-wrap">
       <table class="results-table" id="queue-table" style="display:none">
-        <colgroup>
-          <col class="col-key"><col class="col-title"><col class="col-adotitle">
-          <col class="col-video"><col class="col-conf"><col class="col-date">
-          <col class="col-date"><col class="col-submit"><col class="col-reprocess">
-        </colgroup>
         <thead>
-          <tr>
-            <th class="sortable col-key" onclick="sortTable('queue','key')">Jira Key<div class="th-resize" onmousedown="startResize(event)"></div></th>
-            <th class="sortable col-title" onclick="sortTable('queue','title')">Jira Title<div class="th-resize" onmousedown="startResize(event)"></div></th>
-            <th class="sortable col-adotitle" onclick="sortTable('queue','adotitle')">ADO Bug Title<div class="th-resize" onmousedown="startResize(event)"></div></th>
-            <th class="sortable col-video" onclick="sortTable('queue','video')">Video<div class="th-resize" onmousedown="startResize(event)"></div></th>
-            <th class="sortable col-conf" onclick="sortTable('queue','conf')">Confidence<div class="th-resize" onmousedown="startResize(event)"></div></th>
-            <th class="sortable col-date" onclick="sortTable('queue','created')">Created<div class="th-resize" onmousedown="startResize(event)"></div></th>
-            <th class="sortable col-date" onclick="sortTable('queue','updated')">Updated<div class="th-resize" onmousedown="startResize(event)"></div></th>
-            <th class="col-submit">Review</th>
-            <th class="col-reprocess">Re-process</th>
-          </tr>
           <tr class="filter-row">
-            <th class="col-key"><input type="text" id="filter-queue-search" placeholder="Search…" oninput="renderTab('queue')"><span class="filter-count" id="filter-queue-count"></span></th>
-            <th class="col-title"></th>
-            <th class="col-adotitle"></th>
-            <th class="col-video"><select id="filter-queue-video" onchange="renderTab('queue')"><option value="all">All</option><option value="yes">📹 Yes</option><option value="no">No</option></select></th>
-            <th class="col-conf"><select id="filter-queue-conf" onchange="renderTab('queue')"><option value="all">All</option><option value="high">High (80%+)</option><option value="med">Med (50–79%)</option><option value="low">Low (&lt;50%)</option></select></th>
-            <th class="col-date"></th>
-            <th class="col-date"></th>
-            <th class="col-submit"></th>
-            <th class="col-reprocess"><button class="clear-filters" onclick="clearFilters('queue')">✕ Clear</button></th>
+            <th><input type="text" id="filter-queue-search" placeholder="Search…" oninput="renderTab('queue')"><span class="filter-count" id="filter-queue-count"></span></th>
+            <th></th>
+            <th></th>
+            <th><select id="filter-queue-video" onchange="renderTab('queue')"><option value="all">All</option><option value="yes">📹 Yes</option><option value="no">No</option></select></th>
+            <th><select id="filter-queue-conf" onchange="renderTab('queue')"><option value="all">All</option><option value="high">High (80%+)</option><option value="med">Med (50–79%)</option><option value="low">Low (&lt;50%)</option></select></th>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th><button class="clear-filters" onclick="clearFilters('queue')">✕ Clear</button></th>
+          </tr>
+          <tr>
+            <th class="sortable" onclick="sortTable('queue','key')">Jira Key<div class="th-resize" onmousedown="startResize(event)"></div></th>
+            <th class="sortable" onclick="sortTable('queue','title')">Jira Title<div class="th-resize" onmousedown="startResize(event)"></div></th>
+            <th class="sortable" onclick="sortTable('queue','adotitle')">ADO Bug Title<div class="th-resize" onmousedown="startResize(event)"></div></th>
+            <th class="sortable" onclick="sortTable('queue','video')">Video<div class="th-resize" onmousedown="startResize(event)"></div></th>
+            <th class="sortable" onclick="sortTable('queue','conf')">Confidence<div class="th-resize" onmousedown="startResize(event)"></div></th>
+            <th class="sortable" onclick="sortTable('queue','created')">Created<div class="th-resize" onmousedown="startResize(event)"></div></th>
+            <th class="sortable" onclick="sortTable('queue','updated')">Updated<div class="th-resize" onmousedown="startResize(event)"></div></th>
+            <th>Review &amp; Submit</th>
+            <th>Re-process</th>
           </tr>
         </thead>
         <tbody id="queue-tbody"></tbody>
@@ -275,33 +262,28 @@ textarea{resize:vertical;line-height:1.6}
       </div>
       <div class="table-scroll-wrap">
       <table class="results-table" id="submitted-table" style="display:none">
-        <colgroup>
-          <col class="col-key"><col class="col-title"><col class="col-adotitle">
-          <col class="col-video"><col class="col-conf"><col class="col-ado">
-          <col class="col-date"><col class="col-date"><col class="col-reprocess">
-        </colgroup>
         <thead>
-          <tr>
-            <th class="sortable col-key" onclick="sortTable('submitted','key')">Jira Key<div class="th-resize" onmousedown="startResize(event)"></div></th>
-            <th class="sortable col-title" onclick="sortTable('submitted','title')">Jira Title<div class="th-resize" onmousedown="startResize(event)"></div></th>
-            <th class="sortable col-adotitle" onclick="sortTable('submitted','adotitle')">ADO Bug Title<div class="th-resize" onmousedown="startResize(event)"></div></th>
-            <th class="sortable col-video" onclick="sortTable('submitted','video')">Video<div class="th-resize" onmousedown="startResize(event)"></div></th>
-            <th class="sortable col-conf" onclick="sortTable('submitted','conf')">Confidence<div class="th-resize" onmousedown="startResize(event)"></div></th>
-            <th class="sortable col-ado" onclick="sortTable('submitted','ado')">ADO Bug<div class="th-resize" onmousedown="startResize(event)"></div></th>
-            <th class="sortable col-date" onclick="sortTable('submitted','created')">Created<div class="th-resize" onmousedown="startResize(event)"></div></th>
-            <th class="sortable col-date" onclick="sortTable('submitted','updated')">Updated<div class="th-resize" onmousedown="startResize(event)"></div></th>
-            <th class="col-reprocess">Re-process</th>
-          </tr>
           <tr class="filter-row">
-            <th class="col-key"><input type="text" id="filter-submitted-search" placeholder="Search…" oninput="renderTab('submitted')"><span class="filter-count" id="filter-submitted-count"></span></th>
-            <th class="col-title"></th>
-            <th class="col-adotitle"></th>
-            <th class="col-video"><select id="filter-submitted-video" onchange="renderTab('submitted')"><option value="all">All</option><option value="yes">📹 Yes</option><option value="no">No</option></select></th>
-            <th class="col-conf"><select id="filter-submitted-conf" onchange="renderTab('submitted')"><option value="all">All</option><option value="high">High (80%+)</option><option value="med">Med (50–79%)</option><option value="low">Low (&lt;50%)</option></select></th>
-            <th class="col-ado"></th>
-            <th class="col-date"></th>
-            <th class="col-date"></th>
-            <th class="col-reprocess"><button class="clear-filters" onclick="clearFilters('submitted')">✕ Clear</button></th>
+            <th><input type="text" id="filter-submitted-search" placeholder="Search…" oninput="renderTab('submitted')"><span class="filter-count" id="filter-submitted-count"></span></th>
+            <th></th>
+            <th></th>
+            <th><select id="filter-submitted-video" onchange="renderTab('submitted')"><option value="all">All</option><option value="yes">📹 Yes</option><option value="no">No</option></select></th>
+            <th><select id="filter-submitted-conf" onchange="renderTab('submitted')"><option value="all">All</option><option value="high">High (80%+)</option><option value="med">Med (50–79%)</option><option value="low">Low (&lt;50%)</option></select></th>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th><button class="clear-filters" onclick="clearFilters('submitted')">✕ Clear</button></th>
+          </tr>
+          <tr>
+            <th class="sortable" onclick="sortTable('submitted','key')">Jira Key<div class="th-resize" onmousedown="startResize(event)"></div></th>
+            <th class="sortable" onclick="sortTable('submitted','title')">Jira Title<div class="th-resize" onmousedown="startResize(event)"></div></th>
+            <th class="sortable" onclick="sortTable('submitted','adotitle')">ADO Bug Title<div class="th-resize" onmousedown="startResize(event)"></div></th>
+            <th class="sortable" onclick="sortTable('submitted','video')">Video<div class="th-resize" onmousedown="startResize(event)"></div></th>
+            <th class="sortable" onclick="sortTable('submitted','conf')">Confidence<div class="th-resize" onmousedown="startResize(event)"></div></th>
+            <th class="sortable" onclick="sortTable('submitted','ado')">ADO Bug<div class="th-resize" onmousedown="startResize(event)"></div></th>
+            <th class="sortable" onclick="sortTable('submitted','created')">Created<div class="th-resize" onmousedown="startResize(event)"></div></th>
+            <th class="sortable" onclick="sortTable('submitted','updated')">Updated<div class="th-resize" onmousedown="startResize(event)"></div></th>
+            <th>Re-process</th>
           </tr>
         </thead>
         <tbody id="submitted-tbody"></tbody>
@@ -317,23 +299,20 @@ textarea{resize:vertical;line-height:1.6}
       </div>
       <div class="table-scroll-wrap">
       <table class="results-table" id="skip-table" style="display:none">
-        <colgroup>
-          <col style="width:90px"><col style="width:22%"><col style="width:auto"><col style="width:110px"><col style="width:100px">
-        </colgroup>
         <thead>
-          <tr>
-            <th class="sortable" onclick="sortTable('skipped','key')">Jira Key<div class="th-resize" onmousedown="startResize(event)"></div></th>
-            <th class="sortable" onclick="sortTable('skipped','title')">Title<div class="th-resize" onmousedown="startResize(event)"></div></th>
-            <th>Missing Info<div class="th-resize" onmousedown="startResize(event)"></div></th>
-            <th class="sortable" onclick="sortTable('skipped','commented')">Jira Comment<div class="th-resize" onmousedown="startResize(event)"></div></th>
-            <th>Re-process</th>
-          </tr>
           <tr class="filter-row">
             <th><input type="text" id="filter-skipped-search" placeholder="Search…" oninput="renderTab('skipped')"><span class="filter-count" id="filter-skipped-count"></span></th>
             <th></th>
             <th></th>
             <th><select id="filter-skipped-commented" onchange="renderTab('skipped')"><option value="all">All</option><option value="yes">✓ Posted</option><option value="no">⚠ Failed</option></select></th>
             <th><button class="clear-filters" onclick="clearFilters('skipped')">✕ Clear</button></th>
+          </tr>
+          <tr>
+            <th class="sortable" onclick="sortTable('skipped','key')">Jira Key<div class="th-resize" onmousedown="startResize(event)"></div></th>
+            <th class="sortable" onclick="sortTable('skipped','title')">Title<div class="th-resize" onmousedown="startResize(event)"></div></th>
+            <th>Missing Info<div class="th-resize" onmousedown="startResize(event)"></div></th>
+            <th class="sortable" onclick="sortTable('skipped','commented')">Jira Comment<div class="th-resize" onmousedown="startResize(event)"></div></th>
+            <th>Re-process</th>
           </tr>
         </thead>
         <tbody id="skip-tbody"></tbody>
@@ -1544,10 +1523,11 @@ document.addEventListener('keydown', e => {
 
   document.addEventListener('mousemove', function(e) {
     if (!resizing) return;
-    const newW = Math.max(40, resizing.startW + (e.clientX - resizing.startX));
-    // Set width on the <col> element — this is what table-layout:fixed respects
-    if (resizing.col) resizing.col.style.width = newW + 'px';
-    resizing.th.style.width = newW + 'px';
+    const newW = Math.max(50, resizing.startW + (e.clientX - resizing.startX));
+    // With table-layout:auto, setting minWidth on the th locks in the dragged size
+    resizing.th.style.minWidth = newW + 'px';
+    resizing.th.style.width    = newW + 'px';
+    if (resizing.col) { resizing.col.style.minWidth = newW + 'px'; resizing.col.style.width = newW + 'px'; }
   });
 
   document.addEventListener('mouseup', function() {
