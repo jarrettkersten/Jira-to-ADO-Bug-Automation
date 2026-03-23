@@ -709,17 +709,23 @@ function renderTab(tab) {
   const countEl = document.getElementById(`filter-${tab}-count`);
   if (countEl) countEl.textContent = items.length < raw.length ? `${items.length} of ${raw.length}` : '';
 
-  if      (tab === 'queue')     renderQueueRows(items);
-  else if (tab === 'submitted') renderSubmittedRows(items);
-  else if (tab === 'skipped')   renderSkippedRows(items);
+  if      (tab === 'queue')     renderQueueRows(items, raw.length);
+  else if (tab === 'submitted') renderSubmittedRows(items, raw.length);
+  else if (tab === 'skipped')   renderSkippedRows(items, raw.length);
 }
 
-function renderQueueRows(items) {
+function renderQueueRows(items, rawLength) {
   const tbody = document.getElementById('queue-tbody');
   tbody.innerHTML = '';
   const empty = document.getElementById('queue-empty');
   const table = document.getElementById('queue-table');
-  if (items.length === 0) { empty.style.display = 'block'; table.style.display = 'none'; return; }
+  if (items.length === 0) {
+    if (!rawLength) { empty.style.display = 'block'; table.style.display = 'none'; return; }
+    // Data exists but filters match nothing — keep table visible so filter row stays accessible
+    empty.style.display = 'none'; table.style.display = 'table';
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:32px 16px;color:var(--muted);font-style:italic">No items match your current filters. <button onclick="clearFilters('queue')" style="margin-left:8px;font-size:.78rem;color:var(--brand);background:none;border:1px solid var(--brand-light);border-radius:4px;padding:3px 10px;cursor:pointer">Clear filters</button></td></tr>`;
+    return;
+  }
   empty.style.display = 'none'; table.style.display = 'table';
   items.forEach(item => {
     const conf = item.confidence || 0;
@@ -740,12 +746,17 @@ function renderQueueRows(items) {
   });
 }
 
-function renderSubmittedRows(items) {
+function renderSubmittedRows(items, rawLength) {
   const tbody = document.getElementById('submitted-tbody');
   tbody.innerHTML = '';
   const empty = document.getElementById('submitted-empty');
   const table = document.getElementById('submitted-table');
-  if (items.length === 0) { empty.style.display = 'block'; table.style.display = 'none'; return; }
+  if (items.length === 0) {
+    if (!rawLength) { empty.style.display = 'block'; table.style.display = 'none'; return; }
+    empty.style.display = 'none'; table.style.display = 'table';
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:32px 16px;color:var(--muted);font-style:italic">No items match your current filters. <button onclick="clearFilters('submitted')" style="margin-left:8px;font-size:.78rem;color:var(--brand);background:none;border:1px solid var(--brand-light);border-radius:4px;padding:3px 10px;cursor:pointer">Clear filters</button></td></tr>`;
+    return;
+  }
   empty.style.display = 'none'; table.style.display = 'table';
   items.forEach(item => {
     const conf = item.confidence || 0;
@@ -770,12 +781,17 @@ function renderSubmittedRows(items) {
   });
 }
 
-function renderSkippedRows(items) {
+function renderSkippedRows(items, rawLength) {
   const tbody = document.getElementById('skip-tbody');
   tbody.innerHTML = '';
   const empty = document.getElementById('skipped-empty');
   const table = document.getElementById('skip-table');
-  if (items.length === 0) { empty.style.display = 'block'; table.style.display = 'none'; return; }
+  if (items.length === 0) {
+    if (!rawLength) { empty.style.display = 'block'; table.style.display = 'none'; return; }
+    empty.style.display = 'none'; table.style.display = 'table';
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:32px 16px;color:var(--muted);font-style:italic">No items match your current filters. <button onclick="clearFilters('skipped')" style="margin-left:8px;font-size:.78rem;color:var(--brand);background:none;border:1px solid var(--brand-light);border-radius:4px;padding:3px 10px;cursor:pointer">Clear filters</button></td></tr>`;
+    return;
+  }
   empty.style.display = 'none'; table.style.display = 'table';
   items.forEach(item => {
     const key        = item.jira_key;
