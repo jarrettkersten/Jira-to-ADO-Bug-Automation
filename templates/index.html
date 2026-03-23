@@ -17,7 +17,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 header{background:var(--brand);color:#fff;padding:0 36px;height:58px;display:flex;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,.2)}
 .logo{display:flex;align-items:center;gap:14px;font-size:1rem;font-weight:600;letter-spacing:.01em}
 .logo img{height:28px;opacity:.9}
-main{max-width:980px;margin:36px auto;padding:0 24px;display:flex;flex-direction:column;gap:20px}
+main{max-width:1280px;margin:36px auto;padding:0 24px;display:flex;flex-direction:column;gap:20px}
 
 .card{background:var(--card);border-radius:var(--radius);padding:28px 32px;box-shadow:var(--shadow)}
 .card-title{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:20px;display:flex;align-items:center;gap:10px}
@@ -52,7 +52,7 @@ main{max-width:980px;margin:36px auto;padding:0 24px;display:flex;flex-direction
 
 /* Table */
 .table-scroll-wrap{overflow-x:auto;width:100%}
-.results-table{width:100%;min-width:820px;border-collapse:collapse;font-size:.87rem;table-layout:fixed}
+.results-table{width:100%;min-width:1100px;border-collapse:collapse;font-size:.87rem;table-layout:fixed}
 .results-table th{text-align:left;padding:8px 12px;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .results-table th.sortable{cursor:pointer;user-select:none}
 .results-table th.sortable:hover{color:var(--brand);background:#f8fafc}
@@ -62,22 +62,22 @@ main{max-width:980px;margin:36px auto;padding:0 24px;display:flex;flex-direction
 .results-table tr:last-child td{border-bottom:none}
 .results-table tr:hover td{background:#f8fafc}
 .results-table .col-key{width:90px}
-.results-table .col-title{width:18%}
-.results-table .col-adotitle{width:22%}
-.results-table .col-video{width:82px;text-align:center}
-.results-table .col-conf{width:110px}
+.results-table .col-title{width:20%}
+.results-table .col-adotitle{width:25%}
+.results-table .col-video{width:72px;text-align:center}
+.results-table .col-conf{width:115px}
 .results-table .col-ado{width:90px}
-.results-table .col-date{width:100px}
-.results-table .col-actions{width:155px;overflow:visible;white-space:nowrap}
+.results-table .col-date{width:95px}
+.results-table .col-actions{width:160px;overflow:visible;white-space:nowrap}
 .action-cell{display:flex;flex-direction:column;gap:5px;align-items:stretch;overflow:visible}
-/* Filter toolbar — no scroll, fills full width */
-.filter-toolbar{display:flex;gap:8px;align-items:center;padding:10px 0 6px;flex-wrap:nowrap;width:100%}
-.filter-toolbar input[type=text]{flex:1 1 0;min-width:0;padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;outline:none}
+/* Filter toolbar — inside table-scroll-wrap, constrained to table width */
+.filter-toolbar{display:flex;gap:8px;align-items:center;padding:10px 0 6px;flex-wrap:nowrap;min-width:1100px}
+.filter-toolbar input[type=text]{flex:1 1 0;min-width:0;max-width:280px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;outline:none}
 .filter-toolbar input[type=text]:focus{border-color:var(--brand-light);box-shadow:0 0 0 3px rgba(99,102,241,.08)}
 .filter-toolbar select{flex:0 0 auto;min-width:130px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:#fff;cursor:pointer;color:var(--text)}
 .filter-toolbar .clear-filters{flex:0 0 auto;font-size:.76rem;color:var(--muted);background:none;border:none;cursor:pointer;padding:3px 8px;border-radius:4px;white-space:nowrap}
 .filter-toolbar .clear-filters:hover{color:var(--error);background:#fff5f5}
-.filter-count{flex:0 0 auto;font-size:.76rem;color:var(--muted);white-space:nowrap}
+.filter-count{flex:0 0 auto;font-size:.76rem;color:var(--muted);white-space:nowrap;margin-left:auto}
 .jira-key{font-weight:700;color:var(--brand-light);font-size:.85rem}
 .jira-key a{color:inherit;text-decoration:none}
 .jira-key a:hover{text-decoration:underline}
@@ -269,6 +269,11 @@ textarea{resize:vertical;line-height:1.6}
 
     <!-- Queue tab (pending items only) -->
     <div id="tab-queue" class="tab-panel active">
+      <div id="queue-empty" class="empty-state" style="display:none">
+        <div class="icon">📭</div>
+        <p>No items pending review.</p>
+      </div>
+      <div class="table-scroll-wrap">
       <div class="filter-toolbar" id="filter-queue-toolbar" style="display:none">
         <input type="text" id="filter-queue-search" placeholder="🔍 Search key or title…" oninput="renderTab('queue')">
         <select id="filter-queue-video" onchange="renderTab('queue')">
@@ -285,11 +290,6 @@ textarea{resize:vertical;line-height:1.6}
         <button class="clear-filters" onclick="clearFilters('queue')">✕ Clear</button>
         <span class="filter-count" id="filter-queue-count"></span>
       </div>
-      <div id="queue-empty" class="empty-state" style="display:none">
-        <div class="icon">📭</div>
-        <p>No items pending review.</p>
-      </div>
-      <div class="table-scroll-wrap">
       <table class="results-table" id="queue-table" style="display:none">
         <colgroup>
           <col class="col-key"><col class="col-title"><col class="col-adotitle">
@@ -315,6 +315,11 @@ textarea{resize:vertical;line-height:1.6}
 
     <!-- Submitted tab -->
     <div id="tab-submitted" class="tab-panel">
+      <div id="submitted-empty" class="empty-state" style="display:none">
+        <div class="icon">📭</div>
+        <p>No bugs submitted yet.</p>
+      </div>
+      <div class="table-scroll-wrap">
       <div class="filter-toolbar" id="filter-submitted-toolbar" style="display:none">
         <input type="text" id="filter-submitted-search" placeholder="🔍 Search key, title or bug #…" oninput="renderTab('submitted')">
         <select id="filter-submitted-video" onchange="renderTab('submitted')">
@@ -331,11 +336,6 @@ textarea{resize:vertical;line-height:1.6}
         <button class="clear-filters" onclick="clearFilters('submitted')">✕ Clear</button>
         <span class="filter-count" id="filter-submitted-count"></span>
       </div>
-      <div id="submitted-empty" class="empty-state" style="display:none">
-        <div class="icon">📭</div>
-        <p>No bugs submitted yet.</p>
-      </div>
-      <div class="table-scroll-wrap">
       <table class="results-table" id="submitted-table" style="display:none">
         <colgroup>
           <col class="col-key"><col class="col-title"><col class="col-adotitle">
@@ -362,6 +362,11 @@ textarea{resize:vertical;line-height:1.6}
 
     <!-- Skipped tab -->
     <div id="tab-skipped" class="tab-panel">
+      <div id="skipped-empty" class="empty-state" style="display:none">
+        <div class="icon">🎉</div>
+        <p>All items had sufficient information — nothing was skipped.</p>
+      </div>
+      <div class="table-scroll-wrap">
       <div class="filter-toolbar" id="filter-skipped-toolbar" style="display:none">
         <input type="text" id="filter-skipped-search" placeholder="🔍 Search key, title or missing field…" oninput="renderTab('skipped')">
         <select id="filter-skipped-video" onchange="renderTab('skipped')">
@@ -377,10 +382,6 @@ textarea{resize:vertical;line-height:1.6}
         <button class="clear-filters" onclick="clearFilters('skipped')">✕ Clear</button>
         <span class="filter-count" id="filter-skipped-count"></span>
       </div>
-      <div id="skipped-empty" class="empty-state" style="display:none">
-        <div class="icon">🎉</div>
-        <p>All items had sufficient information — nothing was skipped.</p>
-      </div>
       <table class="results-table" id="skip-table" style="display:none">
         <thead>
           <tr>
@@ -393,6 +394,7 @@ textarea{resize:vertical;line-height:1.6}
         </thead>
         <tbody id="skip-tbody"></tbody>
       </table>
+      </div>
     </div>
 
     <!-- Errors tab -->
