@@ -51,23 +51,33 @@ main{max-width:980px;margin:36px auto;padding:0 24px;display:flex;flex-direction
 .tab-panel.active{display:block}
 
 /* Table */
-.results-table{width:100%;border-collapse:collapse;font-size:.87rem}
-.results-table th{text-align:left;padding:8px 12px;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);white-space:nowrap}
+.table-scroll-wrap{overflow-x:auto;width:100%}
+.results-table{width:100%;min-width:820px;border-collapse:collapse;font-size:.87rem;table-layout:fixed}
+.results-table th{text-align:left;padding:8px 12px;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .results-table th.sortable{cursor:pointer;user-select:none}
 .results-table th.sortable:hover{color:var(--brand);background:#f8fafc}
 .results-table th.sort-asc::after{content:' ▲';font-size:.6rem;color:var(--brand)}
 .results-table th.sort-desc::after{content:' ▼';font-size:.6rem;color:var(--brand)}
-.results-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.results-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .results-table tr:last-child td{border-bottom:none}
 .results-table tr:hover td{background:#f8fafc}
-/* Filter toolbar */
-.filter-toolbar{display:flex;gap:8px;align-items:center;padding:10px 0 6px;flex-wrap:nowrap;overflow-x:auto}
-.filter-toolbar input[type=text]{flex:1 1 160px;min-width:0;max-width:260px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;outline:none}
+.results-table .col-key{width:90px}
+.results-table .col-title{width:18%}
+.results-table .col-adotitle{width:22%}
+.results-table .col-video{width:82px;text-align:center}
+.results-table .col-conf{width:110px}
+.results-table .col-ado{width:90px}
+.results-table .col-date{width:100px}
+.results-table .col-actions{width:155px;overflow:visible;white-space:nowrap}
+.action-cell{display:flex;flex-direction:column;gap:5px;align-items:stretch;overflow:visible}
+/* Filter toolbar — no scroll, fills full width */
+.filter-toolbar{display:flex;gap:8px;align-items:center;padding:10px 0 6px;flex-wrap:nowrap;width:100%}
+.filter-toolbar input[type=text]{flex:1 1 0;min-width:0;padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;outline:none}
 .filter-toolbar input[type=text]:focus{border-color:var(--brand-light);box-shadow:0 0 0 3px rgba(99,102,241,.08)}
-.filter-toolbar select{flex-shrink:0;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:#fff;cursor:pointer;color:var(--text)}
-.filter-toolbar .clear-filters{flex-shrink:0;font-size:.76rem;color:var(--muted);background:none;border:none;cursor:pointer;padding:3px 8px;border-radius:4px;white-space:nowrap}
+.filter-toolbar select{flex:0 0 auto;min-width:130px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:#fff;cursor:pointer;color:var(--text)}
+.filter-toolbar .clear-filters{flex:0 0 auto;font-size:.76rem;color:var(--muted);background:none;border:none;cursor:pointer;padding:3px 8px;border-radius:4px;white-space:nowrap}
 .filter-toolbar .clear-filters:hover{color:var(--error);background:#fff5f5}
-.filter-count{flex-shrink:0;font-size:.76rem;color:var(--muted);margin-left:auto;white-space:nowrap}
+.filter-count{flex:0 0 auto;font-size:.76rem;color:var(--muted);white-space:nowrap}
 .jira-key{font-weight:700;color:var(--brand-light);font-size:.85rem}
 .jira-key a{color:inherit;text-decoration:none}
 .jira-key a:hover{text-decoration:underline}
@@ -82,7 +92,7 @@ main{max-width:980px;margin:36px auto;padding:0 24px;display:flex;flex-direction
 .conf-fill.high{background:var(--success)}
 .conf-fill.med{background:var(--warn)}
 .conf-fill.low{background:var(--error)}
-.action-btn{padding:5px 14px;font-size:.8rem;font-weight:600;border:1.5px solid var(--border);border-radius:6px;cursor:pointer;background:#fff;color:var(--text);transition:all .2s}
+.action-btn{padding:5px 10px;font-size:.78rem;font-weight:600;border:1.5px solid var(--border);border-radius:6px;cursor:pointer;background:#fff;color:var(--text);transition:all .2s;white-space:nowrap;text-align:center}
 .action-btn.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
 .action-btn.primary:hover{background:var(--brand-dark)}
 .action-btn:hover{border-color:var(--brand-light);color:var(--brand-light)}
@@ -279,21 +289,28 @@ textarea{resize:vertical;line-height:1.6}
         <div class="icon">📭</div>
         <p>No items pending review.</p>
       </div>
+      <div class="table-scroll-wrap">
       <table class="results-table" id="queue-table" style="display:none">
+        <colgroup>
+          <col class="col-key"><col class="col-title"><col class="col-adotitle">
+          <col class="col-video"><col class="col-conf"><col class="col-date">
+          <col class="col-date"><col class="col-actions">
+        </colgroup>
         <thead>
           <tr>
-            <th class="sortable" onclick="sortTable('queue','key')">Jira Key</th>
-            <th class="sortable" onclick="sortTable('queue','title')">Jira Title</th>
-            <th class="sortable" onclick="sortTable('queue','adotitle')">ADO Bug Title</th>
-            <th class="sortable" onclick="sortTable('queue','video')">Has Video</th>
-            <th class="sortable" onclick="sortTable('queue','conf')">Confidence</th>
-            <th class="sortable" onclick="sortTable('queue','created')">Created</th>
-            <th class="sortable" onclick="sortTable('queue','updated')">Updated</th>
-            <th>Actions</th>
+            <th class="sortable col-key" onclick="sortTable('queue','key')">Jira Key</th>
+            <th class="sortable col-title" onclick="sortTable('queue','title')">Jira Title</th>
+            <th class="sortable col-adotitle" onclick="sortTable('queue','adotitle')">ADO Bug Title</th>
+            <th class="sortable col-video" onclick="sortTable('queue','video')">Video</th>
+            <th class="sortable col-conf" onclick="sortTable('queue','conf')">Confidence</th>
+            <th class="sortable col-date" onclick="sortTable('queue','created')">Created</th>
+            <th class="sortable col-date" onclick="sortTable('queue','updated')">Updated</th>
+            <th class="col-actions">Actions</th>
           </tr>
         </thead>
         <tbody id="queue-tbody"></tbody>
       </table>
+      </div>
     </div>
 
     <!-- Submitted tab -->
@@ -318,22 +335,29 @@ textarea{resize:vertical;line-height:1.6}
         <div class="icon">📭</div>
         <p>No bugs submitted yet.</p>
       </div>
+      <div class="table-scroll-wrap">
       <table class="results-table" id="submitted-table" style="display:none">
+        <colgroup>
+          <col class="col-key"><col class="col-title"><col class="col-adotitle">
+          <col class="col-video"><col class="col-conf"><col class="col-ado">
+          <col class="col-date"><col class="col-date"><col class="col-actions">
+        </colgroup>
         <thead>
           <tr>
-            <th class="sortable" onclick="sortTable('submitted','key')">Jira Key</th>
-            <th class="sortable" onclick="sortTable('submitted','title')">Jira Title</th>
-            <th class="sortable" onclick="sortTable('submitted','adotitle')">ADO Bug Title</th>
-            <th class="sortable" onclick="sortTable('submitted','video')">Has Video</th>
-            <th class="sortable" onclick="sortTable('submitted','conf')">Confidence</th>
-            <th class="sortable" onclick="sortTable('submitted','ado')">ADO Bug</th>
-            <th class="sortable" onclick="sortTable('submitted','created')">Created</th>
-            <th class="sortable" onclick="sortTable('submitted','updated')">Updated</th>
-            <th>Actions</th>
+            <th class="sortable col-key" onclick="sortTable('submitted','key')">Jira Key</th>
+            <th class="sortable col-title" onclick="sortTable('submitted','title')">Jira Title</th>
+            <th class="sortable col-adotitle" onclick="sortTable('submitted','adotitle')">ADO Bug Title</th>
+            <th class="sortable col-video" onclick="sortTable('submitted','video')">Video</th>
+            <th class="sortable col-conf" onclick="sortTable('submitted','conf')">Confidence</th>
+            <th class="sortable col-ado" onclick="sortTable('submitted','ado')">ADO Bug</th>
+            <th class="sortable col-date" onclick="sortTable('submitted','created')">Created</th>
+            <th class="sortable col-date" onclick="sortTable('submitted','updated')">Updated</th>
+            <th class="col-actions">Actions</th>
           </tr>
         </thead>
         <tbody id="submitted-tbody"></tbody>
       </table>
+      </div>
     </div>
 
     <!-- Skipped tab -->
@@ -875,16 +899,16 @@ function renderQueueRows(items) {
     tr.id = `row-${key}`;
     tr.innerHTML = `
       <td class="jira-key">${item.jira_url ? `<a href="${item.jira_url}" target="_blank">${key}</a>` : key}</td>
-      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(item.jira_title)}">${escHtml(item.jira_title)}</td>
-      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:.83rem" title="${escHtml(item.bug?.title||'')}">${escHtml(item.bug?.title || '—')}</td>
-      <td>${item.has_video ? '<span class="badge badge-blue">📹 Yes</span>' : '<span class="badge badge-gray">—</span>'}</td>
-      <td><div class="conf-bar"><div class="conf-pip"><div class="conf-fill ${conf>=80?'high':conf>=50?'med':'low'}" style="width:${conf}%"></div></div><span style="font-size:.78rem;color:var(--muted)">${conf}%</span></div></td>
-      <td style="font-size:.78rem;color:var(--muted);white-space:nowrap">${fmtDateShort(item.jira_fields?.created)}</td>
-      <td style="font-size:.78rem;color:var(--muted);white-space:nowrap">${fmtDateShort(item.jira_fields?.updated)}</td>
-      <td style="white-space:nowrap;display:flex;gap:6px;flex-wrap:wrap">
+      <td class="col-title" title="${escHtml(item.jira_title)}">${escHtml(item.jira_title)}</td>
+      <td class="col-adotitle" style="color:var(--muted);font-size:.83rem" title="${escHtml(item.bug?.title||'')}">${escHtml(item.bug?.title || '—')}</td>
+      <td class="col-video" style="text-align:center">${item.has_video ? '<span class="badge badge-blue">📹 Yes</span>' : '<span class="badge badge-gray">—</span>'}</td>
+      <td class="col-conf"><div class="conf-bar"><div class="conf-pip"><div class="conf-fill ${conf>=80?'high':conf>=50?'med':'low'}" style="width:${conf}%"></div></div><span style="font-size:.78rem;color:var(--muted)">${conf}%</span></div></td>
+      <td class="col-date">${fmtDateShort(item.jira_fields?.created)}</td>
+      <td class="col-date">${fmtDateShort(item.jira_fields?.updated)}</td>
+      <td class="col-actions"><div class="action-cell">
         <button class="action-btn primary" onclick="openModal('${key}')">Review &amp; Submit</button>
         <button class="action-btn reprocess" id="reprocess-${key}" onclick="reprocessItem('${key}')">↺ Re-process</button>
-      </td>`;
+      </div></td>`;
     tbody.appendChild(tr);
   });
 }
@@ -907,14 +931,16 @@ function renderSubmittedRows(items) {
     tr.className = 'row-submitted';
     tr.innerHTML = `
       <td class="jira-key">${item.jira_url ? `<a href="${item.jira_url}" target="_blank">${key}</a>` : key}</td>
-      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(item.jira_title)}">${escHtml(item.jira_title)}</td>
-      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:.83rem" title="${escHtml(item.bug?.title||'')}">${escHtml(item.bug?.title || '—')}</td>
-      <td>${item.has_video ? '<span class="badge badge-blue">📹 Yes</span>' : '<span class="badge badge-gray">—</span>'}</td>
-      <td><div class="conf-bar"><div class="conf-pip"><div class="conf-fill ${conf>=80?'high':conf>=50?'med':'low'}" style="width:${conf}%"></div></div><span style="font-size:.78rem;color:var(--muted)">${conf}%</span></div></td>
-      <td>${adoLink}</td>
-      <td style="font-size:.78rem;color:var(--muted);white-space:nowrap">${fmtDateShort(item.jira_fields?.created)}</td>
-      <td style="font-size:.78rem;color:var(--muted);white-space:nowrap">${fmtDateShort(item.jira_fields?.updated)}</td>
-      <td><button class="action-btn reprocess" id="reprocess-${key}" onclick="reprocessItem('${key}')">↺ Re-process</button></td>`;
+      <td class="col-title" title="${escHtml(item.jira_title)}">${escHtml(item.jira_title)}</td>
+      <td class="col-adotitle" style="color:var(--muted);font-size:.83rem" title="${escHtml(item.bug?.title||'')}">${escHtml(item.bug?.title || '—')}</td>
+      <td class="col-video" style="text-align:center">${item.has_video ? '<span class="badge badge-blue">📹 Yes</span>' : '<span class="badge badge-gray">—</span>'}</td>
+      <td class="col-conf"><div class="conf-bar"><div class="conf-pip"><div class="conf-fill ${conf>=80?'high':conf>=50?'med':'low'}" style="width:${conf}%"></div></div><span style="font-size:.78rem;color:var(--muted)">${conf}%</span></div></td>
+      <td class="col-ado">${adoLink}</td>
+      <td class="col-date">${fmtDateShort(item.jira_fields?.created)}</td>
+      <td class="col-date">${fmtDateShort(item.jira_fields?.updated)}</td>
+      <td class="col-actions"><div class="action-cell">
+        <button class="action-btn reprocess" id="reprocess-${key}" onclick="reprocessItem('${key}')">↺ Re-process</button>
+      </div></td>`;
     tbody.appendChild(tr);
   });
 }
