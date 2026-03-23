@@ -157,8 +157,17 @@ main{width:100%;margin:0;padding:16px 20px;display:flex;flex-direction:column;ga
 .jira-meta{display:flex;flex-direction:column;gap:3px;flex:1}
 .jf-label{font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .jf-value{font-size:.87rem;color:var(--text);line-height:1.5}
-.jf-desc{white-space:pre-wrap;font-size:.83rem;color:#475569;line-height:1.6;max-height:180px;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:6px;padding:8px 10px}
+.jf-desc{white-space:pre-wrap;font-size:.83rem;color:#475569;line-height:1.6;max-height:180px;overflow-y:auto;background:#f8fafc;border-radius:6px;padding:8px 10px;cursor:default;user-select:text}
 .jf-transcript{white-space:pre-wrap;font-size:.78rem;color:#475569;line-height:1.6;max-height:140px;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-top:4px;font-family:inherit}
+.jf-comments-list{display:flex;flex-direction:column;gap:8px;margin-top:4px;max-height:240px;overflow-y:auto}
+.jf-comment{background:#f8fafc;border-radius:6px;padding:8px 10px;font-size:.82rem;line-height:1.55}
+.jf-comment.jf-comment-recent{background:#eff6ff;border-left:3px solid var(--brand-light)}
+.jf-comment-meta{display:flex;gap:8px;align-items:center;margin-bottom:4px}
+.jf-comment-author{font-weight:700;color:var(--text);font-size:.78rem}
+.jf-comment-date{font-size:.72rem;color:var(--muted)}
+.jf-comment-badge{font-size:.66rem;font-weight:700;background:var(--info-bg);color:var(--info);border-radius:99px;padding:1px 7px}
+.jf-comment-body{color:#475569;white-space:pre-wrap;word-break:break-word}
+.jf-comment-loading{font-size:.82rem;color:var(--muted);padding:8px 0}
 
 /* ADO form inside right pane */
 .fg{display:flex;flex-direction:column;gap:5px}
@@ -438,6 +447,15 @@ textarea{resize:vertical;line-height:1.6}
             Video Transcript <span id="t-toggle-icon">▼</span>
           </div>
           <pre class="jf-transcript" id="j-transcript" style="display:none"></pre>
+        </div>
+
+        <!-- Comments summary -->
+        <div class="jira-field" id="j-comments-wrap" style="display:none">
+          <div class="jf-label" style="display:flex;align-items:center;justify-content:space-between">
+            <span>Comments</span>
+            <span id="j-comments-count" style="font-size:.72rem;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0"></span>
+          </div>
+          <div id="j-comments-list" class="jf-comments-list"></div>
         </div>
       </div>
 
@@ -1031,6 +1049,9 @@ async function openModal(jiraKey) {
     link.textContent = `↗ ${item.jira_key}`;
   }
 
+  // ── Comments (async, non-blocking) ──
+  loadJiraComments(jiraKey);
+
   // ── Right pane: Files to be Attached ──
   excludedAttachments = new Set();   // reset exclusions each time modal opens
   const gallery = document.getElementById('attach-gallery');
@@ -1319,6 +1340,68 @@ async function fetchCoraVersion(url) {
     }
   } catch (e) {
     // Silently ignore version fetch failures
+  }
+}
+
+async function loadJiraComments(jiraKey) {
+  const wrap  = document.getElementById('j-comments-wrap');
+  const list  = document.getElementById('j-comments-list');
+  const count = document.getElementById('j-comments-count');
+
+  // Show loading state immediately
+  wrap.style.display = 'flex';
+  list.innerHTML = '<div class="jf-comment-loading">Loading comments…</div>';
+  count.textContent = '';
+
+  try {
+    const res  = await fetch(`/api/jira/${encodeURIComponent(jiraKey)}/comments`);
+    const data = await res.json();
+
+    if (data.error || !data.comments?.length) {
+      wrap.style.display = 'none';
+      return;
+    }
+
+    const comments = data.comments; // already newest-first from the API
+    count.textContent = `${comments.length} comment${comments.length !== 1 ? 's' : ''}`;
+    list.innerHTML = '';
+
+    comments.forEach((c, idx) => {
+      const isRecent = idx === 0; // most recent first
+      const div = document.createElement('div');
+      div.className = 'jf-comment' + (isRecent ? ' jf-comment-recent' : '');
+
+      // Truncate long comments with a "Show more" toggle
+      const MAX = 300;
+      const bodyShort = c.body.length > MAX ? c.body.slice(0, MAX).trimEnd() + '…' : c.body;
+      const hasMore   = c.body.length > MAX;
+
+      div.innerHTML = `
+        <div class="jf-comment-meta">
+          <span class="jf-comment-author">${escHtml(c.author)}</span>
+          <span class="jf-comment-date">${fmtJiraDate(c.created)}</span>
+          ${isRecent ? '<span class="jf-comment-badge">Most Recent</span>' : ''}
+        </div>
+        <div class="jf-comment-body" id="cbody-${idx}">${escHtml(bodyShort)}</div>
+        ${hasMore ? `<span class="jf-comment-toggle" onclick="toggleComment(${idx},${JSON.stringify(c.body)})" style="font-size:.72rem;color:var(--brand-light);cursor:pointer;margin-top:3px;display:inline-block">Show more</span>` : ''}
+      `;
+      list.appendChild(div);
+    });
+  } catch (e) {
+    wrap.style.display = 'none';
+  }
+}
+
+function toggleComment(idx, fullBody) {
+  const el   = document.getElementById(`cbody-${idx}`);
+  const link = el.nextElementSibling;
+  if (link.textContent === 'Show more') {
+    el.textContent   = fullBody;
+    link.textContent = 'Show less';
+  } else {
+    const MAX = 300;
+    el.textContent   = fullBody.slice(0, MAX).trimEnd() + '…';
+    link.textContent = 'Show more';
   }
 }
 

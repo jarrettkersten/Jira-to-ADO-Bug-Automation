@@ -1343,6 +1343,33 @@ def test_jira():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@app.route("/api/jira/<jira_key>/comments")
+def get_jira_comments(jira_key: str):
+    """Fetch comments for a Jira issue and return them newest-first."""
+    if not (JIRA_BASE_URL and JIRA_EMAIL and JIRA_API_TOKEN):
+        return jsonify({"error": "Jira not configured"}), 503
+    try:
+        url = f"{JIRA_BASE_URL}/rest/api/3/issue/{jira_key}/comment"
+        params = {"maxResults": 50, "orderBy": "-created"}
+        r = requests.get(url, auth=jira_auth(), params=params, timeout=15)
+        r.raise_for_status()
+        raw = r.json().get("comments", [])
+        comments = []
+        for c in raw:
+            author = (c.get("author") or {}).get("displayName", "Unknown")
+            created = c.get("created", "")
+            body = adf_to_text(c.get("body") or {}).strip()
+            if body:
+                comments.append({
+                    "author":  author,
+                    "created": created,
+                    "body":    body,
+                })
+        return jsonify({"comments": comments})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
     app.run(debug=False, host="0.0.0.0", port=port)
