@@ -1345,7 +1345,7 @@ def test_jira():
 
 @app.route("/api/jira/<jira_key>/comments")
 def get_jira_comments(jira_key: str):
-    """Fetch comments for a Jira issue and return them newest-first."""
+    """Fetch comments for a Jira issue and return an AI-generated summary."""
     if not (JIRA_BASE_URL and JIRA_EMAIL and JIRA_API_TOKEN):
         return jsonify({"error": "Jira not configured"}), 503
     try:
@@ -1354,18 +1354,46 @@ def get_jira_comments(jira_key: str):
         r = requests.get(url, auth=jira_auth(), params=params, timeout=15)
         r.raise_for_status()
         raw = r.json().get("comments", [])
-        comments = []
+
+        # Build plain-text comment list (newest first)
+        lines = []
         for c in raw:
-            author = (c.get("author") or {}).get("displayName", "Unknown")
-            created = c.get("created", "")
-            body = adf_to_text(c.get("body") or {}).strip()
+            author  = (c.get("author") or {}).get("displayName", "Unknown")
+            created = c.get("created", "")[:10]  # date only
+            body    = adf_to_text(c.get("body") or {}).strip()
             if body:
-                comments.append({
-                    "author":  author,
-                    "created": created,
-                    "body":    body,
-                })
-        return jsonify({"comments": comments})
+                lines.append(f"[{created}] {author}: {body}")
+
+        count = len(lines)
+        if count == 0:
+            return jsonify({"summary": None, "count": 0})
+
+        # Generate summary with Claude
+        summary = None
+        if ANTHROPIC_API_KEY:
+            try:
+                thread_text = "\n\n".join(lines)
+                prompt = (
+                    "You are summarizing a Jira ticket comment thread for a support engineer.\n"
+                    "Comments are listed newest-first.\n\n"
+                    f"Comments:\n{thread_text}\n\n"
+                    "Write a concise summary (3-5 sentences max) covering:\n"
+                    "1. Any questions that have been asked\n"
+                    "2. Any actions that have been requested\n"
+                    "3. What the thread has concluded or the current status\n\n"
+                    "Be direct and factual. Do not use bullet points. Write in plain prose."
+                )
+                client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+                msg = client.messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=300,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                summary = msg.content[0].text.strip()
+            except Exception:
+                summary = None
+
+        return jsonify({"summary": summary, "count": count})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

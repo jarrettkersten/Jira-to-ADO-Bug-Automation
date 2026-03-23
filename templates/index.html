@@ -159,14 +159,8 @@ main{width:100%;margin:0;padding:16px 20px;display:flex;flex-direction:column;ga
 .jf-value{font-size:.87rem;color:var(--text);line-height:1.5}
 .jf-desc{white-space:pre-wrap;font-size:.83rem;color:#475569;line-height:1.6;max-height:180px;overflow-y:auto;background:#f8fafc;border-radius:6px;padding:8px 10px;cursor:default;user-select:text}
 .jf-transcript{white-space:pre-wrap;font-size:.78rem;color:#475569;line-height:1.6;max-height:140px;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-top:4px;font-family:inherit}
-.jf-comments-list{display:flex;flex-direction:column;gap:8px;margin-top:4px;max-height:240px;overflow-y:auto}
-.jf-comment{background:#f8fafc;border-radius:6px;padding:8px 10px;font-size:.82rem;line-height:1.55}
-.jf-comment.jf-comment-recent{background:#eff6ff;border-left:3px solid var(--brand-light)}
-.jf-comment-meta{display:flex;gap:8px;align-items:center;margin-bottom:4px}
-.jf-comment-author{font-weight:700;color:var(--text);font-size:.78rem}
-.jf-comment-date{font-size:.72rem;color:var(--muted)}
-.jf-comment-badge{font-size:.66rem;font-weight:700;background:var(--info-bg);color:var(--info);border-radius:99px;padding:1px 7px}
-.jf-comment-body{color:#475569;white-space:pre-wrap;word-break:break-word}
+.jf-comment-summary{background:#eff6ff;border-left:3px solid var(--brand-light);border-radius:0 6px 6px 0;padding:10px 12px;font-size:.83rem;line-height:1.6;color:#1e3a5f;margin-top:4px}
+.jf-comment-summary-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--brand-light);margin-bottom:4px}
 .jf-comment-loading{font-size:.82rem;color:var(--muted);padding:8px 0}
 
 /* ADO form inside right pane */
@@ -455,7 +449,7 @@ textarea{resize:vertical;line-height:1.6}
             <span>Comments</span>
             <span id="j-comments-count" style="font-size:.72rem;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0"></span>
           </div>
-          <div id="j-comments-list" class="jf-comments-list"></div>
+          <div id="j-comments-summary"></div>
         </div>
       </div>
 
@@ -1344,64 +1338,38 @@ async function fetchCoraVersion(url) {
 }
 
 async function loadJiraComments(jiraKey) {
-  const wrap  = document.getElementById('j-comments-wrap');
-  const list  = document.getElementById('j-comments-list');
-  const count = document.getElementById('j-comments-count');
+  const wrap    = document.getElementById('j-comments-wrap');
+  const summary = document.getElementById('j-comments-summary');
+  const count   = document.getElementById('j-comments-count');
 
   // Show loading state immediately
   wrap.style.display = 'flex';
-  list.innerHTML = '<div class="jf-comment-loading">Loading comments…</div>';
-  count.textContent = '';
+  summary.innerHTML  = '<div class="jf-comment-loading">Summarising comments…</div>';
+  count.textContent  = '';
 
   try {
     const res  = await fetch(`/api/jira/${encodeURIComponent(jiraKey)}/comments`);
     const data = await res.json();
 
-    if (data.error || !data.comments?.length) {
+    if (data.error || !data.count) {
       wrap.style.display = 'none';
       return;
     }
 
-    const comments = data.comments; // already newest-first from the API
-    count.textContent = `${comments.length} comment${comments.length !== 1 ? 's' : ''}`;
-    list.innerHTML = '';
+    count.textContent = `${data.count} comment${data.count !== 1 ? 's' : ''}`;
 
-    comments.forEach((c, idx) => {
-      const isRecent = idx === 0; // most recent first
-      const div = document.createElement('div');
-      div.className = 'jf-comment' + (isRecent ? ' jf-comment-recent' : '');
-
-      // Truncate long comments with a "Show more" toggle
-      const MAX = 300;
-      const bodyShort = c.body.length > MAX ? c.body.slice(0, MAX).trimEnd() + '…' : c.body;
-      const hasMore   = c.body.length > MAX;
-
-      div.innerHTML = `
-        <div class="jf-comment-meta">
-          <span class="jf-comment-author">${escHtml(c.author)}</span>
-          <span class="jf-comment-date">${fmtJiraDate(c.created)}</span>
-          ${isRecent ? '<span class="jf-comment-badge">Most Recent</span>' : ''}
-        </div>
-        <div class="jf-comment-body" id="cbody-${idx}">${escHtml(bodyShort)}</div>
-        ${hasMore ? `<span class="jf-comment-toggle" onclick="toggleComment(${idx},${JSON.stringify(c.body)})" style="font-size:.72rem;color:var(--brand-light);cursor:pointer;margin-top:3px;display:inline-block">Show more</span>` : ''}
-      `;
-      list.appendChild(div);
-    });
+    if (data.summary) {
+      summary.innerHTML = `
+        <div class="jf-comment-summary">
+          <div class="jf-comment-summary-label">✦ AI Summary</div>
+          ${escHtml(data.summary)}
+        </div>`;
+    } else {
+      // Claude not configured — show a plain note
+      summary.innerHTML = '<div class="jf-comment-loading">Summary unavailable (AI not configured).</div>';
+    }
   } catch (e) {
     wrap.style.display = 'none';
-  }
-}
-
-function toggleComment(idx, fullBody) {
-  const el   = document.getElementById(`cbody-${idx}`);
-  const link = el.nextElementSibling;
-  if (link.textContent === 'Show more') {
-    el.textContent   = fullBody;
-    link.textContent = 'Show less';
-  } else {
-    const MAX = 300;
-    el.textContent   = fullBody.slice(0, MAX).trimEnd() + '…';
-    link.textContent = 'Show more';
   }
 }
 
