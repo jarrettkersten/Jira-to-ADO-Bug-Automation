@@ -23,27 +23,20 @@ main{max-width:1280px;margin:36px auto;padding:0 24px;display:flex;flex-directio
 .card-title{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:20px;display:flex;align-items:center;gap:10px}
 .step-num{background:var(--brand);color:#fff;border-radius:50%;width:24px;height:24px;font-size:.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 
-/* JQL input */
-.jql-row{display:flex;gap:12px;align-items:stretch}
-#jql-input{flex:1;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:.9rem;font-family:inherit;color:var(--text)}
-#jql-input:focus{outline:none;border-color:var(--brand-light);box-shadow:0 0 0 3px rgba(30,111,212,.12)}
-#run-btn{padding:10px 28px;background:var(--brand);color:#fff;font-size:.9rem;font-weight:700;border:none;border-radius:8px;cursor:pointer;white-space:nowrap;transition:background .2s}
-#run-btn:hover{background:var(--brand-dark)}
-#run-btn:disabled{background:var(--muted);cursor:not-allowed}
-.jql-help{font-size:.78rem;color:var(--muted);margin-top:8px}
-.jql-help code{background:#f0f4ff;padding:1px 5px;border-radius:4px;font-family:monospace;font-size:.85em;color:var(--brand)}
-
-/* Progress */
-#progress-card{display:none}
-.pbar-wrap{background:#e2e8f0;border-radius:99px;height:8px;overflow:hidden;margin-bottom:16px}
-.pbar{background:var(--brand-light);height:100%;border-radius:99px;transition:width .5s}
-.pstatus{font-size:.87rem;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
-.pstatus strong{color:var(--text)}
-.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--brand-light);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
-@keyframes spin{to{transform:rotate(360deg)}}
+/* About modal */
+#about-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center}
+#about-overlay.open{display:flex}
+#about-box{background:#fff;border-radius:var(--radius);padding:36px 40px;max-width:680px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 48px rgba(0,0,0,.22)}
+#about-box h2{font-size:1.1rem;font-weight:700;margin-bottom:20px;color:var(--brand)}
+#about-box h3{font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:18px 0 6px}
+#about-box p{font-size:.88rem;line-height:1.65;color:var(--text);margin-bottom:8px}
+#about-box .close-about{float:right;background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted);margin-top:-4px}
+.about-btn{margin-left:auto;padding:4px 12px;font-size:.76rem;font-weight:600;border:1.5px solid var(--border);border-radius:6px;cursor:pointer;background:#fff;color:var(--muted);transition:all .2s}
+.about-btn:hover{border-color:var(--brand-light);color:var(--brand-light)}
 
 /* Results */
 #results-card{display:none}
+.card-title{display:flex;align-items:center;gap:10px;margin-bottom:20px}
 .results-tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px}
 .tab-btn{padding:10px 20px;font-size:.88rem;font-weight:600;color:var(--muted);border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .2s,border-color .2s}
 .tab-btn.active{color:var(--brand-light);border-bottom-color:var(--brand-light)}
@@ -63,21 +56,22 @@ main{max-width:1280px;margin:36px auto;padding:0 24px;display:flex;flex-directio
 .results-table tr:hover td{background:#f8fafc}
 .results-table .col-key{width:90px}
 .results-table .col-title{width:19%}
-.results-table .col-adotitle{width:23%}
+.results-table .col-adotitle{width:22%}
 .results-table .col-video{width:68px;text-align:center}
 .results-table .col-conf{width:110px}
 .results-table .col-ado{width:90px}
 .results-table .col-date{width:90px}
-.results-table .col-actions{width:155px;overflow:visible;white-space:nowrap}
-.action-cell{display:flex;flex-direction:column;gap:5px;align-items:stretch;overflow:visible}
-/* Filter toolbar — sits OUTSIDE the scroll wrapper, fills only card width */
-.filter-toolbar{display:flex;gap:8px;align-items:center;padding:10px 0 6px;flex-wrap:wrap;width:100%}
-.filter-toolbar input[type=text]{flex:0 1 260px;min-width:120px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;outline:none}
-.filter-toolbar input[type=text]:focus{border-color:var(--brand-light);box-shadow:0 0 0 3px rgba(99,102,241,.08)}
-.filter-toolbar select{flex:0 0 auto;min-width:130px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:#fff;cursor:pointer;color:var(--text)}
-.filter-toolbar .clear-filters{flex:0 0 auto;font-size:.76rem;color:var(--muted);background:none;border:none;cursor:pointer;padding:3px 8px;border-radius:4px;white-space:nowrap}
-.filter-toolbar .clear-filters:hover{color:var(--error);background:#fff5f5}
-.filter-count{flex:0 0 auto;font-size:.76rem;color:var(--muted);white-space:nowrap;margin-left:auto}
+.results-table .col-submit{width:125px}
+.results-table .col-reprocess{width:100px}
+/* Column filter row */
+.filter-row th{padding:4px 6px;background:#f8fafc;border-bottom:2px solid var(--border)}
+.filter-row input[type=text]{width:100%;box-sizing:border-box;padding:4px 7px;border:1px solid var(--border);border-radius:5px;font-size:.78rem;color:var(--text);outline:none;background:#fff}
+.filter-row input[type=text]:focus{border-color:var(--brand-light);box-shadow:0 0 0 2px rgba(30,111,212,.1)}
+.filter-row select{width:100%;box-sizing:border-box;padding:4px 5px;border:1px solid var(--border);border-radius:5px;font-size:.78rem;background:#fff;cursor:pointer;color:var(--text);outline:none}
+.filter-row select:focus{border-color:var(--brand-light)}
+.filter-row .clear-filters{font-size:.72rem;color:var(--muted);background:none;border:1px solid var(--border);cursor:pointer;padding:3px 8px;border-radius:4px;white-space:nowrap;width:100%}
+.filter-row .clear-filters:hover{color:var(--error);border-color:var(--error);background:#fff5f5}
+.filter-count{font-size:.72rem;color:var(--muted);display:block;margin-top:3px;white-space:nowrap}
 /* Column resize handle */
 .results-table th{position:relative}
 .th-resize{position:absolute;top:0;right:0;width:6px;height:100%;cursor:col-resize;user-select:none;z-index:1}
@@ -209,52 +203,12 @@ textarea{resize:vertical;line-height:1.6}
 
 <main>
 
-  <!-- ① Query card -->
-  <div class="card" id="query-card">
-    <div class="card-title"><span class="step-num">1</span> Jira Source</div>
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex-wrap:wrap">
-
-      <!-- Left: JQL filter info -->
-      <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:240px">
-        <span style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Active JQL Filter</span>
-        <code id="active-jql" style="font-size:.9rem;font-weight:600;color:var(--brand);background:#f0f4ff;padding:4px 10px;border-radius:6px;">loading…</code>
-        <span id="jira-status" style="font-size:.78rem;color:var(--muted)">corasystems.atlassian.net</span>
-      </div>
-
-      <!-- Right: Webhook config -->
-      <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:280px">
-        <span style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">🔗 Jira Webhook (auto-ingest new issues)</span>
-        <div style="display:flex;align-items:center;gap:6px">
-          <code id="webhook-url" style="flex:1;font-size:.78rem;color:var(--text);background:#f0f4ff;padding:4px 10px;border-radius:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">loading…</code>
-          <button onclick="copyWebhookUrl()" style="flex-shrink:0;padding:4px 10px;font-size:.75rem;font-weight:600;border:1.5px solid var(--border);border-radius:6px;cursor:pointer;background:#fff;color:var(--text)" title="Copy URL">📋 Copy</button>
-        </div>
-        <div style="font-size:.74rem;color:var(--muted);line-height:1.5">
-          Point Jira to this URL &rarr; <em>Project Settings &rarr; Webhooks &rarr; Issue Created</em>.
-          New issues matching your JQL will be ingested automatically.
-          <span id="webhook-last" style="display:inline-block;margin-left:6px"></span>
-        </div>
-      </div>
-
-    </div>
-    <div style="margin-top:14px;display:flex;justify-content:flex-end">
-      <button id="run-btn" onclick="runPipeline()">▶ Run Pipeline</button>
-    </div>
-    <div id="query-error" style="display:none;margin-top:12px"></div>
-  </div>
-
-  <!-- ② Progress card -->
-  <div class="card" id="progress-card">
-    <div class="card-title"><span class="step-num">2</span> Processing</div>
-    <div class="pbar-wrap"><div class="pbar" id="pbar" style="width:0%"></div></div>
-    <div class="pstatus">
-      <span id="pstatus-left"><span class="spinner"></span>Fetching Jira items…</span>
-      <span id="pstatus-right" style="color:var(--muted);font-size:.82rem"></span>
-    </div>
-  </div>
-
-  <!-- ③ Results card -->
+  <!-- Results card -->
   <div class="card" id="results-card">
-    <div class="card-title"><span class="step-num">3</span> Results</div>
+    <div class="card-title">
+      <span style="font-size:1rem;font-weight:700;color:var(--text)">Bug Pipeline</span>
+      <button class="about-btn" onclick="openAbout()">ℹ About</button>
+    </div>
 
     <div class="results-tabs">
       <button class="tab-btn active" onclick="showTab('queue')">
@@ -273,22 +227,6 @@ textarea{resize:vertical;line-height:1.6}
 
     <!-- Queue tab (pending items only) -->
     <div id="tab-queue" class="tab-panel active">
-      <div class="filter-toolbar" id="filter-queue-toolbar" style="display:none">
-        <input type="text" id="filter-queue-search" placeholder="🔍 Search key or title…" oninput="renderTab('queue')">
-        <select id="filter-queue-video" onchange="renderTab('queue')">
-          <option value="all">📹 Video: All</option>
-          <option value="yes">Has Video</option>
-          <option value="no">No Video</option>
-        </select>
-        <select id="filter-queue-conf" onchange="renderTab('queue')">
-          <option value="all">Confidence: All</option>
-          <option value="high">High (80%+)</option>
-          <option value="med">Medium (50–79%)</option>
-          <option value="low">Low (&lt;50%)</option>
-        </select>
-        <button class="clear-filters" onclick="clearFilters('queue')">✕ Clear</button>
-        <span class="filter-count" id="filter-queue-count"></span>
-      </div>
       <div id="queue-empty" class="empty-state" style="display:none">
         <div class="icon">📭</div>
         <p>No items pending review.</p>
@@ -298,7 +236,7 @@ textarea{resize:vertical;line-height:1.6}
         <colgroup>
           <col class="col-key"><col class="col-title"><col class="col-adotitle">
           <col class="col-video"><col class="col-conf"><col class="col-date">
-          <col class="col-date"><col class="col-actions">
+          <col class="col-date"><col class="col-submit"><col class="col-reprocess">
         </colgroup>
         <thead>
           <tr>
@@ -309,7 +247,19 @@ textarea{resize:vertical;line-height:1.6}
             <th class="sortable col-conf" onclick="sortTable('queue','conf')">Confidence<div class="th-resize" onmousedown="startResize(event)"></div></th>
             <th class="sortable col-date" onclick="sortTable('queue','created')">Created<div class="th-resize" onmousedown="startResize(event)"></div></th>
             <th class="sortable col-date" onclick="sortTable('queue','updated')">Updated<div class="th-resize" onmousedown="startResize(event)"></div></th>
-            <th class="col-actions">Actions</th>
+            <th class="col-submit">Review</th>
+            <th class="col-reprocess">Re-process</th>
+          </tr>
+          <tr class="filter-row">
+            <th class="col-key"><input type="text" id="filter-queue-search" placeholder="Search…" oninput="renderTab('queue')"><span class="filter-count" id="filter-queue-count"></span></th>
+            <th class="col-title"></th>
+            <th class="col-adotitle"></th>
+            <th class="col-video"><select id="filter-queue-video" onchange="renderTab('queue')"><option value="all">All</option><option value="yes">📹 Yes</option><option value="no">No</option></select></th>
+            <th class="col-conf"><select id="filter-queue-conf" onchange="renderTab('queue')"><option value="all">All</option><option value="high">High (80%+)</option><option value="med">Med (50–79%)</option><option value="low">Low (&lt;50%)</option></select></th>
+            <th class="col-date"></th>
+            <th class="col-date"></th>
+            <th class="col-submit"></th>
+            <th class="col-reprocess"><button class="clear-filters" onclick="clearFilters('queue')">✕ Clear</button></th>
           </tr>
         </thead>
         <tbody id="queue-tbody"></tbody>
@@ -319,22 +269,6 @@ textarea{resize:vertical;line-height:1.6}
 
     <!-- Submitted tab -->
     <div id="tab-submitted" class="tab-panel">
-      <div class="filter-toolbar" id="filter-submitted-toolbar" style="display:none">
-        <input type="text" id="filter-submitted-search" placeholder="🔍 Search key, title or bug #…" oninput="renderTab('submitted')">
-        <select id="filter-submitted-video" onchange="renderTab('submitted')">
-          <option value="all">📹 Video: All</option>
-          <option value="yes">Has Video</option>
-          <option value="no">No Video</option>
-        </select>
-        <select id="filter-submitted-conf" onchange="renderTab('submitted')">
-          <option value="all">Confidence: All</option>
-          <option value="high">High (80%+)</option>
-          <option value="med">Medium (50–79%)</option>
-          <option value="low">Low (&lt;50%)</option>
-        </select>
-        <button class="clear-filters" onclick="clearFilters('submitted')">✕ Clear</button>
-        <span class="filter-count" id="filter-submitted-count"></span>
-      </div>
       <div id="submitted-empty" class="empty-state" style="display:none">
         <div class="icon">📭</div>
         <p>No bugs submitted yet.</p>
@@ -344,7 +278,7 @@ textarea{resize:vertical;line-height:1.6}
         <colgroup>
           <col class="col-key"><col class="col-title"><col class="col-adotitle">
           <col class="col-video"><col class="col-conf"><col class="col-ado">
-          <col class="col-date"><col class="col-date"><col class="col-actions">
+          <col class="col-date"><col class="col-date"><col class="col-reprocess">
         </colgroup>
         <thead>
           <tr>
@@ -356,7 +290,18 @@ textarea{resize:vertical;line-height:1.6}
             <th class="sortable col-ado" onclick="sortTable('submitted','ado')">ADO Bug<div class="th-resize" onmousedown="startResize(event)"></div></th>
             <th class="sortable col-date" onclick="sortTable('submitted','created')">Created<div class="th-resize" onmousedown="startResize(event)"></div></th>
             <th class="sortable col-date" onclick="sortTable('submitted','updated')">Updated<div class="th-resize" onmousedown="startResize(event)"></div></th>
-            <th class="col-actions">Actions</th>
+            <th class="col-reprocess">Re-process</th>
+          </tr>
+          <tr class="filter-row">
+            <th class="col-key"><input type="text" id="filter-submitted-search" placeholder="Search…" oninput="renderTab('submitted')"><span class="filter-count" id="filter-submitted-count"></span></th>
+            <th class="col-title"></th>
+            <th class="col-adotitle"></th>
+            <th class="col-video"><select id="filter-submitted-video" onchange="renderTab('submitted')"><option value="all">All</option><option value="yes">📹 Yes</option><option value="no">No</option></select></th>
+            <th class="col-conf"><select id="filter-submitted-conf" onchange="renderTab('submitted')"><option value="all">All</option><option value="high">High (80%+)</option><option value="med">Med (50–79%)</option><option value="low">Low (&lt;50%)</option></select></th>
+            <th class="col-ado"></th>
+            <th class="col-date"></th>
+            <th class="col-date"></th>
+            <th class="col-reprocess"><button class="clear-filters" onclick="clearFilters('submitted')">✕ Clear</button></th>
           </tr>
         </thead>
         <tbody id="submitted-tbody"></tbody>
@@ -366,34 +311,29 @@ textarea{resize:vertical;line-height:1.6}
 
     <!-- Skipped tab -->
     <div id="tab-skipped" class="tab-panel">
-      <div class="filter-toolbar" id="filter-skipped-toolbar" style="display:none">
-        <input type="text" id="filter-skipped-search" placeholder="🔍 Search key, title or missing field…" oninput="renderTab('skipped')">
-        <select id="filter-skipped-video" onchange="renderTab('skipped')">
-          <option value="all">📹 Video: All</option>
-          <option value="yes">Has Video</option>
-          <option value="no">No Video</option>
-        </select>
-        <select id="filter-skipped-commented" onchange="renderTab('skipped')">
-          <option value="all">Comment: All</option>
-          <option value="yes">✓ Posted</option>
-          <option value="no">⚠ Failed</option>
-        </select>
-        <button class="clear-filters" onclick="clearFilters('skipped')">✕ Clear</button>
-        <span class="filter-count" id="filter-skipped-count"></span>
-      </div>
       <div id="skipped-empty" class="empty-state" style="display:none">
         <div class="icon">🎉</div>
         <p>All items had sufficient information — nothing was skipped.</p>
       </div>
       <div class="table-scroll-wrap">
       <table class="results-table" id="skip-table" style="display:none">
+        <colgroup>
+          <col style="width:90px"><col style="width:22%"><col style="width:auto"><col style="width:110px"><col style="width:100px">
+        </colgroup>
         <thead>
           <tr>
             <th class="sortable" onclick="sortTable('skipped','key')">Jira Key<div class="th-resize" onmousedown="startResize(event)"></div></th>
             <th class="sortable" onclick="sortTable('skipped','title')">Title<div class="th-resize" onmousedown="startResize(event)"></div></th>
             <th>Missing Info<div class="th-resize" onmousedown="startResize(event)"></div></th>
             <th class="sortable" onclick="sortTable('skipped','commented')">Jira Comment<div class="th-resize" onmousedown="startResize(event)"></div></th>
+            <th>Re-process</th>
+          </tr>
+          <tr class="filter-row">
+            <th><input type="text" id="filter-skipped-search" placeholder="Search…" oninput="renderTab('skipped')"><span class="filter-count" id="filter-skipped-count"></span></th>
             <th></th>
+            <th></th>
+            <th><select id="filter-skipped-commented" onchange="renderTab('skipped')"><option value="all">All</option><option value="yes">✓ Posted</option><option value="no">⚠ Failed</option></select></th>
+            <th><button class="clear-filters" onclick="clearFilters('skipped')">✕ Clear</button></th>
           </tr>
         </thead>
         <tbody id="skip-tbody"></tbody>
@@ -412,6 +352,29 @@ textarea{resize:vertical;line-height:1.6}
   </div>
 
 </main>
+
+<!-- ── About modal ── -->
+<div id="about-overlay" onclick="closeAboutOutside(event)">
+  <div id="about-box">
+    <button class="close-about" onclick="closeAbout()">✕</button>
+    <h2>About this Pipeline</h2>
+
+    <h3>How items appear in the list</h3>
+    <p>Items are ingested automatically via a Jira webhook. When a new issue is created in Jira that matches the configured JQL filter, Jira sends it to this app's webhook endpoint. The app downloads any attached video, transcribes it, extracts screenshots, then sends everything to Claude AI for analysis. Processed items persist in a local database and survive restarts.</p>
+
+    <h3>How items move between tabs</h3>
+    <p><strong>Ready for Review</strong> — Claude determined there was enough information to generate a complete ADO bug report. The item waits here until you review and manually submit it, or re-process it.</p>
+    <p><strong>Submitted</strong> — You clicked "Review &amp; Submit" and confirmed submission. The ADO work item was created and the item is moved here permanently.</p>
+    <p><strong>Needs More Info</strong> — Claude found the Jira ticket lacked the required detail (repro steps, expected vs. actual behavior, etc.) to generate a quality bug report. Claude posts a comment back to the Jira ticket listing what's missing. Once the reporter updates the ticket, you can click <em>Re-process</em> to try again.</p>
+    <p><strong>Errors</strong> — Something failed during processing (video download, transcription, ADO API, etc.). The error message is shown so you can investigate.</p>
+
+    <h3>How confidence is calculated</h3>
+    <p>Confidence is not a code formula — it's a 0–100 score that Claude assigns based on how complete and unambiguous the ticket information is. A high score means Claude could clearly identify the bug title, repro steps, expected behavior, and actual behavior. A low score means the information was sparse or ambiguous but still technically sufficient to attempt a report.</p>
+
+    <h3>What confidence is used for</h3>
+    <p>Confidence is purely informational — it does not block submission. It appears as a color-coded bar (green ≥ 80%, yellow 50–79%, red &lt; 50%) and can be used to filter the table. Low-confidence items are worth reviewing more carefully before submitting, as Claude may have made assumptions to fill in missing detail.</p>
+  </div>
+</div>
 
 <!-- ── Review & Submit modal ── -->
 <div id="modal-overlay" onclick="closeModalOutside(event)">
@@ -631,65 +594,13 @@ textarea{resize:vertical;line-height:1.6}
 </div>
 
 <script>
-let currentJobId = null;
-let pollInterval = null;
 let lastJobData  = null;
 
-// ── Load config + persistent queue on page start ──────────────
+// ── Load persistent queue on page start ──────────────────────
 (async function init() {
-  try {
-    const res  = await fetch('/api/config');
-    const data = await res.json();
-    document.getElementById('active-jql').textContent  = data.jql     || '(not set)';
-    document.getElementById('jira-status').textContent = data.jira_url || 'corasystems.atlassian.net';
-    if (data.webhook_url) {
-      document.getElementById('webhook-url').textContent = data.webhook_url;
-      document.getElementById('webhook-url').title       = data.webhook_url;
-    }
-  } catch(e) {
-    document.getElementById('active-jql').textContent = '(could not load)';
-  }
-  // Load webhook status indicator
-  await refreshWebhookStatus();
-  // Auto-load any previously processed items from SQLite
   await loadPersistentQueue();
-  // Poll webhook status every 30 s so the "last received" badge stays fresh
-  setInterval(refreshWebhookStatus, 30_000);
 })();
 
-async function refreshWebhookStatus() {
-  try {
-    const res  = await fetch('/api/webhook/status');
-    const data = await res.json();
-    const el   = document.getElementById('webhook-last');
-    if (!el) return;
-    if (data.last_received) {
-      const ago = timeSince(data.last_received);
-      el.innerHTML = `<span style="color:var(--success);font-weight:600">● Last received: ${escHtml(data.last_key)} (${ago})</span>`;
-    } else {
-      el.innerHTML = '<span style="color:var(--muted)">No events received yet.</span>';
-    }
-  } catch(e) { /* silently ignore */ }
-}
-
-function copyWebhookUrl() {
-  const url = document.getElementById('webhook-url').textContent;
-  navigator.clipboard?.writeText(url).then(() => {
-    const btn = event.currentTarget;
-    const orig = btn.textContent;
-    btn.textContent = '✓ Copied';
-    setTimeout(() => { btn.textContent = orig; }, 1500);
-  });
-}
-
-function timeSince(isoTs) {
-  if (!isoTs) return '';
-  const secs = Math.floor((Date.now() - new Date(isoTs + 'Z').getTime()) / 1000);
-  if (secs < 60)   return `${secs}s ago`;
-  if (secs < 3600) return `${Math.floor(secs/60)}m ago`;
-  if (secs < 86400)return `${Math.floor(secs/3600)}h ago`;
-  return `${Math.floor(secs/86400)}d ago`;
-}
 
 async function loadPersistentQueue() {
   try {
@@ -711,83 +622,6 @@ async function loadPersistentQueue() {
   }
 }
 
-// ── Pipeline control ─────────────────────────────────────────
-async function runPipeline() {
-  clearQueryError();
-  setRunBtn(false);
-  showProgress();
-
-  try {
-    const res = await fetch('/api/start-pipeline', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({})
-    });
-    const data = await res.json();
-    if (!res.ok) { throw new Error(data.error || 'Failed to start pipeline'); }
-
-    currentJobId = data.job_id;
-    pollInterval = setInterval(pollStatus, 1500);
-  } catch(e) {
-    showQueryError(e.message);
-    hideProgress();
-    setRunBtn(true);
-  }
-}
-
-async function pollStatus() {
-  if (!currentJobId) return;
-  try {
-    const res  = await fetch(`/api/job-status/${currentJobId}`);
-    const data = await res.json();
-
-    updateProgress(data);
-
-    if (data.status === 'done' || data.status === 'error') {
-      clearInterval(pollInterval);
-      pollInterval = null;
-      setRunBtn(true);
-      hideProgress();
-      // Reload the full persistent queue (includes newly processed + old items)
-      await loadPersistentQueue();
-    }
-  } catch(e) {
-    console.error('Poll error:', e);
-  }
-}
-
-// ── Progress ─────────────────────────────────────────────────
-function showProgress() {
-  document.getElementById('progress-card').style.display = 'block';
-}
-function hideProgress() {
-  document.getElementById('progress-card').style.display = 'none';
-}
-function updateProgress(data) {
-  const total     = data.total || 0;
-  const processed = data.processed || 0;
-  const cached    = data.cached_count || 0;
-  const pct = total > 0 ? Math.round((processed / total) * 100) : (data.status === 'running' ? 10 : 100);
-
-  document.getElementById('pbar').style.width = pct + '%';
-
-  let left = '', right = '';
-  if (data.status === 'running') {
-    const item = data.current_item ? ` — <strong>${data.current_item}</strong>` : '';
-    left = `<span class="spinner"></span>Processing${item}…`;
-    right = total > 0 ? `${processed} / ${total} new` : '';
-    if (cached > 0) right += ` &nbsp;·&nbsp; ${cached} already cached`;
-  } else if (data.status === 'done') {
-    const newStr  = total > 0  ? `${total} new item${total !== 1 ? 's' : ''} processed` : 'No new items';
-    const cachedStr = cached > 0 ? `, ${cached} already cached` : '';
-    left = `✅ Done! ${newStr}${cachedStr}`;
-  } else if (data.status === 'error') {
-    left = `❌ Error: ${data.error_message || 'Unknown error'}`;
-  }
-
-  document.getElementById('pstatus-left').innerHTML = left;
-  document.getElementById('pstatus-right').innerHTML = right;
-}
 
 // ── Sort / filter state ───────────────────────────────────────
 let rawQueue     = [];
@@ -880,9 +714,7 @@ function renderTab(tab) {
   const raw = tab === 'queue' ? rawQueue : tab === 'submitted' ? rawSubmitted : rawSkipped;
   const items = applyFilterSort(raw, tab);
 
-  // Filter toolbar visibility + count badge
-  const toolbar = document.getElementById(`filter-${tab}-toolbar`);
-  if (toolbar) toolbar.style.display = raw.length > 0 ? 'flex' : 'none';
+  // Filter count badge in column header
   const countEl = document.getElementById(`filter-${tab}-count`);
   if (countEl) countEl.textContent = items.length < raw.length ? `${items.length} of ${raw.length}` : '';
 
@@ -911,10 +743,8 @@ function renderQueueRows(items) {
       <td class="col-conf"><div class="conf-bar"><div class="conf-pip"><div class="conf-fill ${conf>=80?'high':conf>=50?'med':'low'}" style="width:${conf}%"></div></div><span style="font-size:.78rem;color:var(--muted)">${conf}%</span></div></td>
       <td class="col-date">${fmtDateShort(item.jira_fields?.created)}</td>
       <td class="col-date">${fmtDateShort(item.jira_fields?.updated)}</td>
-      <td class="col-actions"><div class="action-cell">
-        <button class="action-btn primary" onclick="openModal('${key}')">Review &amp; Submit</button>
-        <button class="action-btn reprocess" id="reprocess-${key}" onclick="reprocessItem('${key}')">↺ Re-process</button>
-      </div></td>`;
+      <td class="col-submit"><button class="action-btn primary" style="width:100%" onclick="openModal('${key}')">Review &amp; Submit</button></td>
+      <td class="col-reprocess"><button class="action-btn reprocess" style="width:100%" id="reprocess-${key}" onclick="reprocessItem('${key}')">↺ Re-process</button></td>`;
     tbody.appendChild(tr);
   });
 }
@@ -944,9 +774,7 @@ function renderSubmittedRows(items) {
       <td class="col-ado">${adoLink}</td>
       <td class="col-date">${fmtDateShort(item.jira_fields?.created)}</td>
       <td class="col-date">${fmtDateShort(item.jira_fields?.updated)}</td>
-      <td class="col-actions"><div class="action-cell">
-        <button class="action-btn reprocess" id="reprocess-${key}" onclick="reprocessItem('${key}')">↺ Re-process</button>
-      </div></td>`;
+      <td class="col-reprocess"><button class="action-btn reprocess" style="width:100%" id="reprocess-${key}" onclick="reprocessItem('${key}')">↺ Re-process</button></td>`;
     tbody.appendChild(tr);
   });
 }
@@ -1666,14 +1494,6 @@ function setSelect(id, v) {
     if (opt.value.toLowerCase() === v.toLowerCase()) { opt.selected = true; return; }
   }
 }
-function showQueryError(msg) {
-  const el = document.getElementById('query-error');
-  el.innerHTML = `<div class="alert alert-error">⚠ ${escHtml(msg)}</div>`;
-  el.style.display = 'block';
-}
-function clearQueryError() {
-  document.getElementById('query-error').style.display = 'none';
-}
 function showSubmitResult(type, html) {
   const el = document.getElementById('submit-result');
   el.className = type;
@@ -1683,18 +1503,24 @@ function showSubmitResult(type, html) {
 function hideSubmitResult() {
   document.getElementById('submit-result').style.display = 'none';
 }
-function setRunBtn(enabled) {
-  const btn = document.getElementById('run-btn');
-  btn.disabled = !enabled;
-  btn.textContent = enabled ? '▶ Run Pipeline' : '⏳ Running…';
-}
 function escHtml(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// keyboard shortcut: Escape closes modal
+// ── About modal ──────────────────────────────────────────────
+function openAbout() {
+  document.getElementById('about-overlay').classList.add('open');
+}
+function closeAbout() {
+  document.getElementById('about-overlay').classList.remove('open');
+}
+function closeAboutOutside(e) {
+  if (e.target === document.getElementById('about-overlay')) closeAbout();
+}
+
+// keyboard shortcut: Escape closes any open modal
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
+  if (e.key === 'Escape') { closeModal(); closeAbout(); }
 });
 
 // ── Column resize ─────────────────────────────────────────────
@@ -1706,12 +1532,11 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     const handle = e.target;
     const th = handle.parentElement;
-    resizing = {
-      th,
-      handle,
-      startX: e.clientX,
-      startW: th.offsetWidth
-    };
+    // Find matching <col> in colgroup by column index
+    const table = th.closest('table');
+    const colIndex = Array.from(th.parentElement.children).indexOf(th);
+    const col = table.querySelector('colgroup')?.children[colIndex] || null;
+    resizing = { th, handle, col, startX: e.clientX, startW: th.offsetWidth };
     handle.classList.add('resizing');
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
@@ -1719,8 +1544,9 @@ document.addEventListener('keydown', e => {
 
   document.addEventListener('mousemove', function(e) {
     if (!resizing) return;
-    const dx = e.clientX - resizing.startX;
-    const newW = Math.max(40, resizing.startW + dx);
+    const newW = Math.max(40, resizing.startW + (e.clientX - resizing.startX));
+    // Set width on the <col> element — this is what table-layout:fixed respects
+    if (resizing.col) resizing.col.style.width = newW + 'px';
     resizing.th.style.width = newW + 'px';
   });
 
@@ -1732,7 +1558,6 @@ document.addEventListener('keydown', e => {
     resizing = null;
   });
 
-  // expose to inline handlers
   window.startResize = startResize;
 })();
 </script>
