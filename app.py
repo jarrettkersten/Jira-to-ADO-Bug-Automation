@@ -31,6 +31,10 @@ ADO_ORG_URL  = os.getenv("ADO_ORG_URL", "https://dev.azure.com/CoraSystems").rst
 ADO_PAT      = os.getenv("ADO_PAT", "")
 ADO_PROJECT  = os.getenv("ADO_PROJECT", "PPM")
 
+# ── Cora Knowledge (Loop Search) API config ──────────────────────────────────
+LOOP_SEARCH_URL = os.getenv("LOOP_SEARCH_URL", "").rstrip("/")     # e.g. https://your-railway-app.up.railway.app
+LOOP_SEARCH_KEY = os.getenv("LOOP_SEARCH_KEY", "")                 # Bearer token for /api/v1/query
+
 JIRA_BASE_URL  = os.getenv("JIRA_BASE_URL", "").rstrip("/")   # e.g. https://acme.atlassian.net
 JIRA_EMAIL     = os.getenv("JIRA_EMAIL", "")
 JIRA_API_TOKEN = os.getenv("JIRA_API_TOKEN", "")
@@ -87,7 +91,11 @@ def init_db():
         """)
         # Migrate existing DBs that predate these columns
         for col, defn in [("extra_video_count", "INTEGER DEFAULT 0"),
-                          ("other_attachments_json", "TEXT")]:
+                          ("other_attachments_json", "TEXT"),
+                          ("knowledge_answer", "TEXT"),
+                          ("knowledge_sources", "TEXT"),
+                          ("knowledge_metadata", "TEXT"),
+                          ("knowledge_at", "TEXT")]:
             try:
                 conn.execute(f"ALTER TABLE queue_items ADD COLUMN {col} {defn}")
             except Exception:
@@ -180,7 +188,8 @@ def db_get_all_queue_items() -> list[dict]:
             """SELECT jira_key, jira_title, jira_url, has_video, has_desc, confidence,
                       bug_json, jira_fields_json, other_attachments_json,
                       video_filename, video_size, extra_video_count,
-                      submitted, ado_work_item_id, ado_url, processed_at, submitted_at
+                      submitted, ado_work_item_id, ado_url, processed_at, submitted_at,
+                      knowledge_answer, knowledge_sources, knowledge_metadata, knowledge_at
                FROM queue_items ORDER BY submitted ASC, processed_at DESC"""
         ).fetchall()
     result = []
@@ -190,6 +199,17 @@ def db_get_all_queue_items() -> list[dict]:
         item["jira_fields"]       = json.loads(item.pop("jira_fields_json")      or "{}")
         item["other_attachments"] = json.loads(item.pop("other_attachments_json") or "[]")
         item["has_video"]         = bool(item["has_video"])
+        # Knowledge fields
+        k_answer = item.pop("knowledge_answer", None)
+        k_sources = item.pop("knowledge_sources", None)
+        k_meta = item.pop("knowledge_metadata", None)
+        k_at = item.pop("knowledge_at", None)
+        item["knowledge"] = {
+            "answer": k_answer,
+            "sources_used": k_sources,
+            "metadata": json.loads(k_meta or "{}"),
+            "generated_at": k_at,
+        } if k_answer else None
         item["has_desc"]          = bool(item["has_desc"])
         item["submitted"]         = bool(item["submitted"])
         item["extra_video_count"] = item.get("extra_video_count") or 0
@@ -784,6 +804,75 @@ def submit_bug_to_ado(data: dict, project: str = None, pat: str = None) -> dict:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Cora Knowledge — call Loop Search API for recommended answers
+# ══════════════════════════════════════════════════════════════════════════════
+
+def call_loop_search(query: str) -> dict | None:
+    """
+    Call the Loop Search /api/v1/query endpoint and return the response dict.
+    Sends the query as-is — same as typing into "Your question" in the UI.
+    Returns None if the API is not configured or the call fails.
+    """
+    if not LOOP_SEARCH_URL or not LOOP_SEARCH_KEY:
+        return None
+    try:
+        payload = {
+            "query": query,
+        }
+        r = requests.post(
+            f"{LOOP_SEARCH_URL}/api/v1/query",
+            headers={
+                "Authorization": f"Bearer {LOOP_SEARCH_KEY}",
+                "Content-Type":  "application/json",
+            },
+            json=payload,
+            timeout=600,   # agentic loop can take several minutes
+        )
+        r.raise_for_status()
+        data = r.json()
+        if data.get("success"):
+            return data
+        print(f"[Knowledge] API returned error: {data.get('error', 'unknown')}")
+        return None
+    except Exception as e:
+        print(f"[Knowledge] Call failed: {e}")
+        return None
+
+
+def db_save_knowledge(jira_key: str, answer: str, sources_used: str,
+                      metadata_json: str):
+    """Save a Cora Knowledge response for a queue item."""
+    with _db() as conn:
+        conn.execute("""
+            UPDATE queue_items
+            SET knowledge_answer = ?, knowledge_sources = ?,
+                knowledge_metadata = ?, knowledge_at = ?
+            WHERE jira_key = ?
+        """, (answer, sources_used, metadata_json,
+              datetime.utcnow().isoformat(), jira_key))
+        conn.commit()
+
+
+def db_get_knowledge(jira_key: str) -> dict | None:
+    """Retrieve the stored knowledge response for a queue item."""
+    with _db() as conn:
+        row = conn.execute(
+            """SELECT knowledge_answer, knowledge_sources,
+                      knowledge_metadata, knowledge_at
+               FROM queue_items WHERE jira_key = ?""",
+            (jira_key,)
+        ).fetchone()
+    if not row or not row["knowledge_answer"]:
+        return None
+    return {
+        "answer":       row["knowledge_answer"],
+        "sources_used": row["knowledge_sources"],
+        "metadata":     json.loads(row["knowledge_metadata"] or "{}"),
+        "generated_at": row["knowledge_at"],
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Background pipeline job
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -910,6 +999,23 @@ def process_single_item(job_id: str, issue: dict):
             job["queue"].append(queue_item)
             db_save_queue_item(queue_item)   # persist to SQLite
             print(f"[Pipeline] {key} → QUEUED (confidence {result.get('confidence')}%)")
+
+            # Auto-trigger Cora Knowledge lookup in background
+            if LOOP_SEARCH_URL and LOOP_SEARCH_KEY:
+                def _auto_knowledge(k=key, desc=description_text):
+                    try:
+                        if not desc:
+                            print(f"[Knowledge] {k} — skipped (no Jira description)")
+                            return
+                        kr = call_loop_search(desc)
+                        if kr:
+                            db_save_knowledge(k, kr["answer"],
+                                              kr.get("sources_used", ""),
+                                              json.dumps(kr.get("metadata", {})))
+                            print(f"[Knowledge] {k} — auto-lookup complete")
+                    except Exception as ke:
+                        print(f"[Knowledge] {k} — auto-lookup error: {ke}")
+                threading.Thread(target=_auto_knowledge, daemon=True).start()
         else:
             missing      = result.get("missing_fields", [])
             explanation  = result.get("missing_explanation", "")
@@ -1164,6 +1270,61 @@ def dismiss_failed_item(jira_key: str):
     return jsonify({"success": True})
 
 
+# ── Cora Knowledge API routes ─────────────────────────────────────────────────
+
+@app.route("/api/knowledge/<jira_key>", methods=["POST"])
+def trigger_knowledge(jira_key: str):
+    """Trigger a Cora Knowledge lookup for a queue item. Runs in background."""
+    if not LOOP_SEARCH_URL or not LOOP_SEARCH_KEY:
+        return jsonify({"error": "Loop Search API not configured. Set LOOP_SEARCH_URL and LOOP_SEARCH_KEY."}), 503
+
+    # Fetch the item from DB to get its context
+    with _db() as conn:
+        row = conn.execute(
+            "SELECT jira_title, bug_json, jira_fields_json FROM queue_items WHERE jira_key=?",
+            (jira_key,)
+        ).fetchone()
+    if not row:
+        return jsonify({"error": "Item not found"}), 404
+
+    jira_fields = json.loads(row["jira_fields_json"] or "{}")
+
+    # Pass the Jira description as the query (same as "Your question" in the UI)
+    query = jira_fields.get("description", "").strip()
+    if not query:
+        return jsonify({"error": "No Jira description available to search."}), 400
+
+    # Run in background thread
+    def _run():
+        try:
+            result = call_loop_search(query)
+            if result:
+                db_save_knowledge(
+                    jira_key,
+                    result["answer"],
+                    result.get("sources_used", ""),
+                    json.dumps(result.get("metadata", {})),
+                )
+                print(f"[Knowledge] {jira_key} — answer saved ({result.get('sources_used', '')})")
+            else:
+                print(f"[Knowledge] {jira_key} — no result returned")
+        except Exception as e:
+            print(f"[Knowledge] {jira_key} — error: {e}")
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    return jsonify({"status": "started", "jira_key": jira_key}), 202
+
+
+@app.route("/api/knowledge/<jira_key>", methods=["GET"])
+def get_knowledge(jira_key: str):
+    """Return the stored Cora Knowledge response for a queue item."""
+    result = db_get_knowledge(jira_key)
+    if not result:
+        return jsonify({"status": "not_found"}), 200
+    return jsonify({"status": "ready", **result})
+
+
 # ── Jira webhook ──────────────────────────────────────────────────────────────
 # Track the last webhook receipt for the UI status indicator
 _webhook_last_received: dict = {"ts": None, "key": None}
@@ -1391,6 +1552,7 @@ def health():
             "openai":      bool(OPENAI_API_KEY),
             "ado":         bool(ADO_PAT),
             "jira":        bool(JIRA_BASE_URL and JIRA_EMAIL and JIRA_API_TOKEN),
+            "knowledge":   bool(LOOP_SEARCH_URL and LOOP_SEARCH_KEY),
         }
     })
 
@@ -1401,10 +1563,11 @@ def config():
     # Build the public-facing webhook URL using the current request host
     host = request.host_url.rstrip("/")
     return jsonify({
-        "jql":          JIRA_JQL,
-        "jira_url":     JIRA_BASE_URL,
-        "ado_project":  ADO_PROJECT,
-        "webhook_url":  f"{host}/api/webhook/jira",
+        "jql":              JIRA_JQL,
+        "jira_url":         JIRA_BASE_URL,
+        "ado_project":      ADO_PROJECT,
+        "webhook_url":      f"{host}/api/webhook/jira",
+        "knowledge_enabled": bool(LOOP_SEARCH_URL and LOOP_SEARCH_KEY),
     })
 
 

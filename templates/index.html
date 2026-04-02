@@ -120,7 +120,7 @@ main{width:100%;margin:0;padding:16px 20px;display:flex;flex-direction:column;ga
 #modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,28,43,.45);z-index:100;align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto}
 #modal-overlay.open{display:flex}
 #modal-overlay.fullscreen{padding:0;align-items:stretch}
-#modal-box{background:#fff;border-radius:var(--radius);width:100%;max-width:1160px;box-shadow:0 20px 60px rgba(0,0,0,.25);position:relative;margin:auto;display:flex;flex-direction:column}
+#modal-box{background:#fff;border-radius:var(--radius);width:100%;max-width:1480px;box-shadow:0 20px 60px rgba(0,0,0,.25);position:relative;margin:auto;display:flex;flex-direction:column}
 #modal-overlay.fullscreen #modal-box{max-width:100%;border-radius:0;height:100vh;margin:0}
 #modal-overlay.fullscreen .modal-split{flex:1;min-height:0}
 #modal-overlay.fullscreen .split-pane{overflow-y:auto}
@@ -139,11 +139,31 @@ main{width:100%;margin:0;padding:16px 20px;display:flex;flex-direction:column;ga
 #submit-result.success{background:var(--success-bg);border-color:#bbf7d0;color:var(--success)}
 #submit-result.error{background:var(--error-bg);border-color:#fecaca;color:var(--error)}
 
-/* Split layout */
+/* Split layout — 3 panes: Jira | Knowledge | ADO */
 .modal-split{display:flex;flex:1;min-height:0;overflow:hidden}
 .split-pane{display:flex;flex-direction:column;gap:0;overflow-y:auto;padding:20px 22px}
-.split-left{flex:0 0 42%;border-right:1px solid var(--border);background:#f8fafc;max-height:78vh}
+.split-left{flex:0 0 30%;border-right:1px solid var(--border);background:#f8fafc;max-height:78vh}
+.split-center{flex:0 0 34%;border-right:1px solid var(--border);background:#fff;max-height:78vh;display:flex;flex-direction:column}
 .split-right{flex:1;max-height:78vh;display:flex;flex-direction:column;gap:12px}
+
+/* Knowledge panel */
+.knowledge-body{flex:1;overflow-y:auto;padding:0;font-size:.85rem;line-height:1.65;color:var(--text)}
+.knowledge-body h2{font-size:.92rem;font-weight:700;margin:16px 0 8px;color:var(--brand)}
+.knowledge-body h3{font-size:.84rem;font-weight:700;margin:12px 0 6px;color:#334155}
+.knowledge-body p{margin:0 0 8px}
+.knowledge-body pre{background:#f1f5f9;border-radius:6px;padding:10px;font-size:.78rem;overflow-x:auto;margin:8px 0}
+.knowledge-body code{font-size:.8rem;background:#f1f5f9;padding:1px 4px;border-radius:3px}
+.knowledge-body ul,.knowledge-body ol{margin:4px 0 8px 18px}
+.knowledge-body li{margin-bottom:3px}
+.knowledge-body hr{border:none;border-top:1px solid var(--border);margin:16px 0}
+.knowledge-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:12px;padding:40px 24px;color:var(--muted);height:100%}
+.knowledge-empty .icon{font-size:2rem;opacity:.5}
+.knowledge-empty p{font-size:.84rem;line-height:1.5;max-width:260px}
+.knowledge-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:40px;color:var(--muted);height:100%}
+.knowledge-loading .spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--brand-light);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.knowledge-meta{display:flex;gap:12px;flex-wrap:wrap;padding:10px 0 6px;border-top:1px solid var(--border);margin-top:auto;font-size:.72rem;color:var(--muted);flex-shrink:0}
+.knowledge-meta span{display:flex;align-items:center;gap:3px}
 
 /* Pane header */
 .pane-header{display:flex;align-items:center;gap:8px;font-size:.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);flex-shrink:0}
@@ -453,6 +473,33 @@ textarea{resize:vertical;line-height:1.6}
             <span id="j-comments-count" style="font-size:.72rem;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0"></span>
           </div>
           <div id="j-comments-summary"></div>
+        </div>
+      </div>
+
+      <!-- ── CENTER: Cora Knowledge (read-only) ── -->
+      <div class="split-pane split-center" id="knowledge-panel">
+        <div class="pane-header">
+          <span class="pane-logo" style="font-size:1rem">🧠</span>
+          <span>Cora Knowledge</span>
+          <button class="action-btn" id="knowledge-refresh-btn" onclick="triggerKnowledge()" style="margin-left:auto;font-size:.72rem;padding:3px 10px" title="Re-run knowledge lookup">↻ Refresh</button>
+        </div>
+        <div class="knowledge-body" id="knowledge-body">
+          <div class="knowledge-empty" id="knowledge-empty">
+            <div class="icon">🧠</div>
+            <p>Cora Knowledge will search the codebase and documentation to provide context for this ticket.</p>
+            <button class="action-btn primary" onclick="triggerKnowledge()" style="font-size:.82rem;padding:6px 16px">Search Cora Knowledge</button>
+          </div>
+          <div class="knowledge-loading" id="knowledge-loading" style="display:none">
+            <div class="spinner"></div>
+            <span style="font-size:.84rem">Searching codebase &amp; docs…</span>
+            <span style="font-size:.74rem;color:var(--muted)">This can take a few minutes</span>
+          </div>
+          <div id="knowledge-content" style="display:none"></div>
+        </div>
+        <div class="knowledge-meta" id="knowledge-meta" style="display:none">
+          <span id="km-sources"></span>
+          <span id="km-time"></span>
+          <span id="km-date"></span>
         </div>
       </div>
 
@@ -1165,6 +1212,9 @@ async function openModal(jiraKey) {
   // ── Comments (async, non-blocking) ──
   loadJiraComments(jiraKey);
 
+  // ── Center pane: Cora Knowledge (async, non-blocking) ──
+  loadKnowledge(jiraKey);
+
   // ── Right pane: Files to be Attached ──
   excludedAttachments = new Set();   // reset exclusions each time modal opens
   const gallery = document.getElementById('attach-gallery');
@@ -1500,7 +1550,129 @@ function toggleTranscript() {
   icon.textContent   = show ? '▲' : '▼';
 }
 
+// ── Cora Knowledge panel ─────────────────────────────────────────────────────
+let _knowledgePolling = null;
+
+async function loadKnowledge(jiraKey) {
+  // First check if knowledge is pre-loaded in the queue item data
+  const item = (lastJobData?.queue || []).find(i => i.jira_key === jiraKey);
+  if (item && item.knowledge && item.knowledge.answer) {
+    showKnowledgeResult(item.knowledge);
+    return;
+  }
+
+  // Otherwise check the API
+  try {
+    const r = await fetch(`/api/knowledge/${encodeURIComponent(jiraKey)}`);
+    const d = await r.json();
+    if (d.status === 'ready') {
+      showKnowledgeResult(d);
+      return;
+    }
+  } catch(e) {
+    console.warn('Knowledge fetch error:', e);
+  }
+  // Not ready yet — show empty state
+  document.getElementById('knowledge-empty').style.display = 'flex';
+  document.getElementById('knowledge-loading').style.display = 'none';
+  document.getElementById('knowledge-content').style.display = 'none';
+  document.getElementById('knowledge-meta').style.display = 'none';
+}
+
+async function triggerKnowledge() {
+  if (!activeItemIdx) return;
+  const jiraKey = activeItemIdx;
+
+  // Switch to loading state
+  document.getElementById('knowledge-empty').style.display = 'none';
+  document.getElementById('knowledge-content').style.display = 'none';
+  document.getElementById('knowledge-meta').style.display = 'none';
+  document.getElementById('knowledge-loading').style.display = 'flex';
+  document.getElementById('knowledge-refresh-btn').disabled = true;
+
+  try {
+    await fetch(`/api/knowledge/${encodeURIComponent(jiraKey)}`, { method: 'POST' });
+  } catch(e) {
+    console.warn('Knowledge trigger error:', e);
+  }
+
+  // Poll for result
+  clearInterval(_knowledgePolling);
+  _knowledgePolling = setInterval(async () => {
+    try {
+      const r = await fetch(`/api/knowledge/${encodeURIComponent(jiraKey)}`);
+      const d = await r.json();
+      if (d.status === 'ready') {
+        clearInterval(_knowledgePolling);
+        _knowledgePolling = null;
+        showKnowledgeResult(d);
+      }
+    } catch(e) { /* keep polling */ }
+  }, 5000);
+}
+
+function showKnowledgeResult(data) {
+  document.getElementById('knowledge-empty').style.display = 'none';
+  document.getElementById('knowledge-loading').style.display = 'none';
+  document.getElementById('knowledge-refresh-btn').disabled = false;
+
+  // Render markdown-like answer as HTML (simple conversion)
+  const content = document.getElementById('knowledge-content');
+  content.innerHTML = renderMarkdown(data.answer || '');
+  content.style.display = 'block';
+
+  // Metadata footer
+  const meta = document.getElementById('knowledge-meta');
+  const m = data.metadata || {};
+  document.getElementById('km-sources').innerHTML =
+    m.confidence ? `🎯 ${escHtml(m.confidence)} confidence` : '';
+  document.getElementById('km-time').innerHTML =
+    m.elapsed_seconds ? `⏱ ${m.elapsed_seconds}s` : '';
+  document.getElementById('km-date').innerHTML =
+    data.generated_at ? `📅 ${fmtJiraDate(data.generated_at)}` : '';
+  meta.style.display = 'flex';
+}
+
+function renderMarkdown(md) {
+  // Lightweight markdown → HTML (handles the most common patterns)
+  let html = md;
+  // Code blocks
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
+    `<pre><code>${escHtml(code.trim())}</code></pre>`);
+  // Inline code
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // Headers
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h2>$1</h2>');
+  // Bold
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Italic
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  // Horizontal rules
+  html = html.replace(/^---$/gm, '<hr>');
+  // Bullet lists
+  html = html.replace(/^[-•] (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`);
+  // Numbered lists
+  html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+  // Paragraphs (lines not already wrapped)
+  html = html.replace(/^(?!<[hulop]|<\/|$)(.+)$/gm, '<p>$1</p>');
+  // Clean up double <p> around block elements
+  html = html.replace(/<p>(<h[23]>)/g, '$1');
+  html = html.replace(/(<\/h[23]>)<\/p>/g, '$1');
+  return html;
+}
+
+function stopKnowledgePolling() {
+  if (_knowledgePolling) {
+    clearInterval(_knowledgePolling);
+    _knowledgePolling = null;
+  }
+}
+
 function closeModal() {
+  stopKnowledgePolling();
   const overlay = document.getElementById('modal-overlay');
   overlay.classList.remove('open', 'fullscreen');
   const btn = document.getElementById('modal-expand');
