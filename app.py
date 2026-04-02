@@ -10,7 +10,7 @@ Stack: Python / Flask  (same tech stack as cora-bug-creator-shared)
 Requires: ffmpeg, ffprobe on PATH
 """
 
-import os, json, io, re, tempfile, traceback, base64, subprocess, uuid, threading, sqlite3
+import os, json, io, re, tempfile, traceback, base64, subprocess, uuid, threading, sqlite3, time
 from datetime import datetime, timedelta
 import requests
 from flask import Flask, render_template, request, jsonify
@@ -809,31 +809,63 @@ def submit_bug_to_ado(data: dict, project: str = None, pat: str = None) -> dict:
 
 def call_loop_search(query: str) -> dict | None:
     """
-    Call the Loop Search /api/v1/query endpoint and return the response dict.
-    Sends the query as-is — same as typing into "Your question" in the UI.
-    Returns None if the API is not configured or the call fails.
+    Call the Loop Search /api/v1/query endpoint using async mode.
+    Submits the query with async=true, then polls for results.
+    This avoids HTTP timeout issues (Railway defaults to 300s).
+    Returns the full response dict on success, or None on failure.
     """
     if not LOOP_SEARCH_URL or not LOOP_SEARCH_KEY:
         return None
+
+    headers = {
+        "Authorization": f"Bearer {LOOP_SEARCH_KEY}",
+        "Content-Type":  "application/json",
+    }
+
     try:
-        payload = {
-            "query": query,
-        }
+        # Step 1: Submit the query in async mode (returns instantly)
+        payload = {"query": query, "async": True}
         r = requests.post(
             f"{LOOP_SEARCH_URL}/api/v1/query",
-            headers={
-                "Authorization": f"Bearer {LOOP_SEARCH_KEY}",
-                "Content-Type":  "application/json",
-            },
+            headers=headers,
             json=payload,
-            timeout=600,   # agentic loop can take several minutes
+            timeout=30,   # async submit returns in under 1 second
         )
         r.raise_for_status()
-        data = r.json()
-        if data.get("success"):
-            return data
-        print(f"[Knowledge] API returned error: {data.get('error', 'unknown')}")
+        submit_data = r.json()
+        job_id = submit_data.get("job_id")
+        if not job_id:
+            print(f"[Knowledge] Async submit did not return a job_id: {submit_data}")
+            return None
+        print(f"[Knowledge] Async job submitted: {job_id}")
+
+        # Step 2: Poll for results every 15 seconds, up to 10 minutes
+        poll_url = f"{LOOP_SEARCH_URL}/api/v1/query/{job_id}"
+        max_attempts = 40   # 40 × 15s = 600s (10 minutes)
+        for attempt in range(1, max_attempts + 1):
+            time.sleep(15)
+            poll_r = requests.get(poll_url, headers=headers, timeout=30)
+            poll_r.raise_for_status()
+            data = poll_r.json()
+            status = data.get("status")
+
+            if status == "completed":
+                if data.get("success"):
+                    print(f"[Knowledge] Job {job_id} completed (attempt {attempt})")
+                    return data
+                print(f"[Knowledge] Job {job_id} completed but success=false: {data.get('error', 'unknown')}")
+                return None
+            elif status == "failed":
+                print(f"[Knowledge] Job {job_id} failed: {data.get('error', 'unknown')}")
+                return None
+            else:
+                # Still processing — continue polling
+                if attempt % 4 == 0:  # log every ~60s
+                    print(f"[Knowledge] Job {job_id} still processing (poll {attempt}/{max_attempts})")
+
+        print(f"[Knowledge] Job {job_id} timed out after {max_attempts * 15}s of polling")
         return None
+
     except Exception as e:
         print(f"[Knowledge] Call failed: {e}")
         return None
