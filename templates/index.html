@@ -329,6 +329,9 @@ textarea{resize:vertical;line-height:1.6}
         <div class="icon">✅</div>
         <p>No errors.</p>
       </div>
+      <div id="errors-toolbar" style="display:none;padding:0 0 10px 0">
+        <button onclick="retryAllFailed()" id="retry-all-btn" style="background:#dc2626;color:#fff;border:none;border-radius:6px;padding:7px 18px;font-size:.85rem;cursor:pointer;font-weight:600">🔄 Retry All</button>
+      </div>
       <div id="errors-list" style="display:none;display:flex;flex-direction:column;gap:8px"></div>
     </div>
   </div>
@@ -602,10 +605,10 @@ async function loadPersistentQueue() {
       status:  'done',
       queue:   data.queue   || [],
       skipped: data.skipped || [],
-      errors:  [],
+      errors:  data.errors  || [],
       cached_count: 0,
     };
-    if (lastJobData.queue.length > 0 || lastJobData.skipped.length > 0) {
+    if (lastJobData.queue.length > 0 || lastJobData.skipped.length > 0 || lastJobData.errors.length > 0) {
       renderResults(lastJobData);
     }
   } catch(e) {
@@ -831,17 +834,45 @@ function renderResults(data) {
   renderTab('submitted');
   renderTab('skipped');
 
-  // Errors tab (no sort/filter needed)
+  // Errors tab — persisted failed items from DB
   const errList = document.getElementById('errors-list');
+  const errToolbar = document.getElementById('errors-toolbar');
   if (errors.length === 0) {
     document.getElementById('errors-empty').style.display = 'block';
     errList.style.display = 'none';
+    errToolbar.style.display = 'none';
   } else {
     document.getElementById('errors-empty').style.display = 'none';
+    errToolbar.style.display = 'block';
     errList.style.display = 'flex';
     errList.innerHTML = '';
     errors.forEach(e => {
-      errList.innerHTML += `<div class="alert alert-error"><strong>${escHtml(e.key || '?')}</strong> — ${escHtml(e.error || 'Unknown error')}</div>`;
+      const key       = escHtml(e.jira_key || e.key || '?');
+      const title     = escHtml(e.jira_title || '');
+      const error     = escHtml(e.error || 'Unknown error');
+      const source    = escHtml(e.source || 'pipeline');
+      const failedAt  = e.failed_at ? fmtDateShort(e.failed_at) : '';
+      const retries   = e.retry_count || 0;
+      const jiraUrl   = e.jira_url || '#';
+      errList.innerHTML += `
+        <div class="alert alert-error" style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:12px 16px">
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+              <a href="${escHtml(jiraUrl)}" target="_blank" style="font-weight:700;color:#1d4ed8;text-decoration:none">${key}</a>
+              <span style="color:#64748b;font-size:.8rem">${title}</span>
+            </div>
+            <div style="color:#991b1b;font-size:.85rem;word-break:break-word">${error}</div>
+            <div style="color:#94a3b8;font-size:.75rem;margin-top:4px">
+              Source: ${source} · Failed: ${failedAt}${retries > 0 ? ' · Retries: ' + retries : ''}
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button onclick="retryFailed('${key}')" id="retry-${key}"
+              style="background:#2563eb;color:#fff;border:none;border-radius:5px;padding:5px 12px;font-size:.8rem;cursor:pointer;font-weight:600">🔄 Retry</button>
+            <button onclick="dismissFailed('${key}')"
+              style="background:#64748b;color:#fff;border:none;border-radius:5px;padding:5px 12px;font-size:.8rem;cursor:pointer">✕</button>
+          </div>
+        </div>`;
     });
   }
 
@@ -877,6 +908,78 @@ async function reprocessItem(jiraKey) {
   } catch(e) {
     if (btn) { btn.disabled = false; btn.textContent = '↺ Re-process'; }
     alert(`Could not start re-process: ${e.message}`);
+  }
+}
+
+// ── Retry / dismiss failed items ─────────────────────────────
+async function retryFailed(jiraKey) {
+  const btn = document.getElementById(`retry-${jiraKey}`);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Retrying…'; }
+
+  try {
+    const res  = await fetch(`/api/errors/${encodeURIComponent(jiraKey)}/retry`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Retry failed');
+
+    const jobId = data.job_id;
+    const poll = setInterval(async () => {
+      try {
+        const sr    = await fetch(`/api/job-status/${jobId}`);
+        const sdata = await sr.json();
+        if (sdata.status === 'done' || sdata.status === 'error') {
+          clearInterval(poll);
+          if (sdata.status === 'error') {
+            alert(`Retry failed for ${jiraKey}: ${sdata.error_message || 'Unknown error'}`);
+          }
+          await loadPersistentQueue();
+        }
+      } catch(e) { clearInterval(poll); }
+    }, 1500);
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Retry'; }
+    alert(`Could not retry: ${e.message}`);
+  }
+}
+
+async function retryAllFailed() {
+  const btn = document.getElementById('retry-all-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Retrying all…'; }
+
+  try {
+    const res  = await fetch('/api/errors/retry-all', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Retry all failed');
+
+    if (data.count === 0) {
+      if (btn) { btn.disabled = false; btn.textContent = '🔄 Retry All'; }
+      return;
+    }
+
+    // Poll the last job to know when all are done, then reload
+    const lastJob = data.jobs[data.jobs.length - 1].job_id;
+    const poll = setInterval(async () => {
+      try {
+        const sr    = await fetch(`/api/job-status/${lastJob}`);
+        const sdata = await sr.json();
+        if (sdata.status === 'done' || sdata.status === 'error') {
+          clearInterval(poll);
+          await loadPersistentQueue();
+        }
+      } catch(e) { clearInterval(poll); }
+    }, 2000);
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Retry All'; }
+    alert(`Could not retry all: ${e.message}`);
+  }
+}
+
+async function dismissFailed(jiraKey) {
+  try {
+    const res = await fetch(`/api/errors/${encodeURIComponent(jiraKey)}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Dismiss failed');
+    await loadPersistentQueue();
+  } catch(e) {
+    alert(`Could not dismiss: ${e.message}`);
   }
 }
 

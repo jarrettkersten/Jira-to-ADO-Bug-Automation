@@ -105,6 +105,17 @@ def init_db():
                 processed_at TEXT
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS failed_items (
+                jira_key     TEXT PRIMARY KEY,
+                jira_title   TEXT,
+                jira_url     TEXT,
+                error        TEXT,
+                source       TEXT,
+                failed_at    TEXT,
+                retry_count  INTEGER DEFAULT 0
+            )
+        """)
         conn.commit()
 
 
@@ -212,20 +223,6 @@ def db_get_all_skipped_items() -> list[dict]:
     return result
 
 
-def db_is_processed(jira_key: str) -> bool:
-    """Return True if this key exists in either the queue or skipped table."""
-    with _db() as conn:
-        q = conn.execute(
-            "SELECT jira_key FROM queue_items WHERE jira_key=?", (jira_key,)
-        ).fetchone()
-        if q:
-            return True
-        s = conn.execute(
-            "SELECT jira_key FROM skipped_items WHERE jira_key=?", (jira_key,)
-        ).fetchone()
-        return s is not None
-
-
 def db_mark_submitted(jira_key: str, work_item_id, url: str):
     with _db() as conn:
         conn.execute("""
@@ -246,7 +243,60 @@ def db_delete_item(jira_key: str):
     with _db() as conn:
         conn.execute("DELETE FROM queue_items  WHERE jira_key=?", (jira_key,))
         conn.execute("DELETE FROM skipped_items WHERE jira_key=?", (jira_key,))
+        conn.execute("DELETE FROM failed_items  WHERE jira_key=?", (jira_key,))
         conn.commit()
+
+
+def db_save_failed_item(jira_key: str, jira_title: str, jira_url: str,
+                        error: str, source: str = "pipeline"):
+    """Persist a processing failure so the user can see it and retry."""
+    with _db() as conn:
+        existing = conn.execute(
+            "SELECT retry_count FROM failed_items WHERE jira_key=?", (jira_key,)
+        ).fetchone()
+        retry_count = (existing["retry_count"] + 1) if existing else 0
+        conn.execute("""
+            INSERT OR REPLACE INTO failed_items
+            (jira_key, jira_title, jira_url, error, source, failed_at, retry_count)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (jira_key, jira_title, jira_url, error, source,
+              datetime.utcnow().isoformat(), retry_count))
+        conn.commit()
+
+
+def db_get_all_failed_items() -> list[dict]:
+    """Return all failed items for the Errors tab."""
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM failed_items ORDER BY failed_at DESC"
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def db_delete_failed_item(jira_key: str):
+    """Remove a single failed item (used when retrying)."""
+    with _db() as conn:
+        conn.execute("DELETE FROM failed_items WHERE jira_key=?", (jira_key,))
+        conn.commit()
+
+
+def db_is_processed(jira_key: str) -> bool:
+    """Return True if this key exists in queue, skipped, or failed table."""
+    with _db() as conn:
+        q = conn.execute(
+            "SELECT jira_key FROM queue_items WHERE jira_key=?", (jira_key,)
+        ).fetchone()
+        if q:
+            return True
+        s = conn.execute(
+            "SELECT jira_key FROM skipped_items WHERE jira_key=?", (jira_key,)
+        ).fetchone()
+        if s:
+            return True
+        f = conn.execute(
+            "SELECT jira_key FROM failed_items WHERE jira_key=?", (jira_key,)
+        ).fetchone()
+        return f is not None
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -936,8 +986,12 @@ def run_pipeline(job_id: str, jql: str):
                 process_single_item(job_id, issue)
             except Exception as e:
                 key = issue.get("key", "?")
+                fields = issue.get("fields", {})
+                title  = fields.get("summary", key)
+                jira_url = f"{JIRA_BASE_URL}/browse/{key}" if JIRA_BASE_URL else ""
                 print(f"[Pipeline] Unhandled error for {key}: {e}\n{traceback.format_exc()}")
                 job["errors"].append({"key": key, "error": str(e)})
+                db_save_failed_item(key, title, jira_url, str(e), source="pipeline")
                 job["processed"] += 1
 
         job["status"] = "done"
@@ -1023,10 +1077,11 @@ def submit_bug():
 
 @app.route("/api/queue")
 def get_queue():
-    """Return the full persistent queue + skipped list from SQLite."""
+    """Return the full persistent queue + skipped + failed lists from SQLite."""
     return jsonify({
         "queue":   db_get_all_queue_items(),
         "skipped": db_get_all_skipped_items(),
+        "errors":  db_get_all_failed_items(),
     })
 
 
@@ -1073,6 +1128,40 @@ def reprocess_item(jira_key: str):
     t = threading.Thread(target=run_reprocess, args=(job_id, jira_key), daemon=True)
     t.start()
     return jsonify({"job_id": job_id})
+
+
+@app.route("/api/errors/<jira_key>/retry", methods=["POST"])
+def retry_failed_item(jira_key: str):
+    """Retry a single failed item — removes from failed_items and reprocesses."""
+    db_delete_failed_item(jira_key)
+    job_id = _new_job(f"retry:{jira_key}")
+    t = threading.Thread(target=run_reprocess, args=(job_id, jira_key), daemon=True)
+    t.start()
+    return jsonify({"job_id": job_id})
+
+
+@app.route("/api/errors/retry-all", methods=["POST"])
+def retry_all_failed():
+    """Retry all failed items — each gets its own background thread."""
+    failed = db_get_all_failed_items()
+    if not failed:
+        return jsonify({"status": "nothing_to_retry", "count": 0})
+    job_ids = []
+    for item in failed:
+        key = item["jira_key"]
+        db_delete_failed_item(key)
+        job_id = _new_job(f"retry:{key}")
+        t = threading.Thread(target=run_reprocess, args=(job_id, key), daemon=True)
+        t.start()
+        job_ids.append({"key": key, "job_id": job_id})
+    return jsonify({"status": "retrying", "count": len(job_ids), "jobs": job_ids})
+
+
+@app.route("/api/errors/<jira_key>", methods=["DELETE"])
+def dismiss_failed_item(jira_key: str):
+    """Dismiss a failed item without retrying."""
+    db_delete_failed_item(jira_key)
+    return jsonify({"success": True})
 
 
 # ── Jira webhook ──────────────────────────────────────────────────────────────
@@ -1140,6 +1229,9 @@ def run_webhook_item(job_id: str, issue: dict):
     """Background entry point for a single webhook-triggered issue."""
     job  = _jobs[job_id]
     key  = issue.get("key", "?")
+    fields = issue.get("fields", {})
+    title  = fields.get("summary", key)
+    jira_url = f"{JIRA_BASE_URL}/browse/{key}" if JIRA_BASE_URL else ""
     job["total"] = 1
     try:
         process_single_item(job_id, issue)
@@ -1149,6 +1241,7 @@ def run_webhook_item(job_id: str, issue: dict):
     except Exception as e:
         job["status"]        = "error"
         job["error_message"] = str(e)
+        db_save_failed_item(key, title, jira_url, str(e), source="webhook")
         print(f"[Webhook] {key} failed: {e}\n{traceback.format_exc()}")
 
 
@@ -1191,8 +1284,12 @@ def run_reprocess(job_id: str, jira_key: str):
         job["current_item"] = None
         print(f"[Reprocess] {jira_key} complete")
     except Exception as e:
+        fields = issue.get("fields", {}) if issue else {}
+        title  = fields.get("summary", jira_key)
+        jira_url = f"{JIRA_BASE_URL}/browse/{jira_key}" if JIRA_BASE_URL else ""
         job["status"] = "error"
         job["error_message"] = str(e)
+        db_save_failed_item(jira_key, title, jira_url, str(e), source="reprocess")
         print(f"[Reprocess] {jira_key} failed: {e}\n{traceback.format_exc()}")
 
 
