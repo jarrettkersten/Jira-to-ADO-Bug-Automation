@@ -33,7 +33,7 @@ ADO_PROJECT  = os.getenv("ADO_PROJECT", "PPM")
 
 # ── Cora Knowledge (Loop Search) API config ──────────────────────────────────
 LOOP_SEARCH_URL = os.getenv("LOOP_SEARCH_URL", "").rstrip("/")     # e.g. https://your-railway-app.up.railway.app
-LOOP_SEARCH_KEY = os.getenv("LOOP_SEARCH_KEY", "")                 # Bearer token for /api/v1/query
+LOOP_SEARCH_KEY = os.getenv("LOOP_SEARCH_KEY", "")                 # Bearer token for /api/query
 
 JIRA_BASE_URL  = os.getenv("JIRA_BASE_URL", "").rstrip("/")   # e.g. https://acme.atlassian.net
 JIRA_EMAIL     = os.getenv("JIRA_EMAIL", "")
@@ -95,7 +95,8 @@ def init_db():
                           ("knowledge_answer", "TEXT"),
                           ("knowledge_sources", "TEXT"),
                           ("knowledge_metadata", "TEXT"),
-                          ("knowledge_at", "TEXT")]:
+                          ("knowledge_at", "TEXT"),
+                          ("knowledge_error", "TEXT")]:
             try:
                 conn.execute(f"ALTER TABLE queue_items ADD COLUMN {col} {defn}")
             except Exception:
@@ -807,40 +808,41 @@ def submit_bug_to_ado(data: dict, project: str = None, pat: str = None) -> dict:
 # Cora Knowledge — call Loop Search API for recommended answers
 # ══════════════════════════════════════════════════════════════════════════════
 
-def call_loop_search(query: str) -> dict | None:
+def call_loop_search(query: str) -> dict:
     """
-    Call the Loop Search /api/v1/query endpoint using async mode.
-    Submits the query with async=true, then polls for results.
+    Call the Loop Search /api/query endpoint using async mode.
+    Submits the query, then polls for results.
     This avoids HTTP timeout issues (Railway defaults to 300s).
-    Returns the full response dict on success, or None on failure.
+    Returns the full response dict on success.
+    On failure returns {"_error": "<human-readable reason>"}.
     """
     if not LOOP_SEARCH_URL or not LOOP_SEARCH_KEY:
-        return None
+        return {"_error": "Loop Search API not configured (LOOP_SEARCH_URL / LOOP_SEARCH_KEY missing)"}
 
     headers = {
         "Authorization": f"Bearer {LOOP_SEARCH_KEY}",
         "Content-Type":  "application/json",
     }
 
+    submit_url = f"{LOOP_SEARCH_URL}/api/query"
     try:
         # Step 1: Submit the query in async mode (returns instantly)
-        payload = {"query": query, "async": True}
-        r = requests.post(
-            f"{LOOP_SEARCH_URL}/api/v1/query",
-            headers=headers,
-            json=payload,
-            timeout=30,   # async submit returns in under 1 second
-        )
+        payload = {"query": query}
+        r = requests.post(submit_url, headers=headers, json=payload, timeout=30)
+        if r.status_code == 404:
+            return {"_error": f"POST {submit_url} returned 404 — check LOOP_SEARCH_URL and API path"}
+        if r.status_code == 401 or r.status_code == 403:
+            return {"_error": f"POST {submit_url} returned {r.status_code} — check LOOP_SEARCH_KEY"}
         r.raise_for_status()
         submit_data = r.json()
         job_id = submit_data.get("job_id")
         if not job_id:
             print(f"[Knowledge] Async submit did not return a job_id: {submit_data}")
-            return None
+            return {"_error": f"API did not return a job_id. Response: {json.dumps(submit_data)[:300]}"}
         print(f"[Knowledge] Async job submitted: {job_id}")
 
         # Step 2: Poll for results every 15 seconds, up to 10 minutes
-        poll_url = f"{LOOP_SEARCH_URL}/api/v1/query/{job_id}"
+        poll_url = f"{LOOP_SEARCH_URL}/api/query/{job_id}"
         max_attempts = 40   # 40 × 15s = 600s (10 minutes)
         for attempt in range(1, max_attempts + 1):
             time.sleep(15)
@@ -853,22 +855,30 @@ def call_loop_search(query: str) -> dict | None:
                 if data.get("success"):
                     print(f"[Knowledge] Job {job_id} completed (attempt {attempt})")
                     return data
-                print(f"[Knowledge] Job {job_id} completed but success=false: {data.get('error', 'unknown')}")
-                return None
+                err = data.get("error", "unknown")
+                print(f"[Knowledge] Job {job_id} completed but success=false: {err}")
+                return {"_error": f"Search completed but returned an error: {err}"}
             elif status == "failed":
-                print(f"[Knowledge] Job {job_id} failed: {data.get('error', 'unknown')}")
-                return None
+                err = data.get("error", "unknown")
+                print(f"[Knowledge] Job {job_id} failed: {err}")
+                return {"_error": f"Search job failed: {err}"}
             else:
                 # Still processing — continue polling
                 if attempt % 4 == 0:  # log every ~60s
                     print(f"[Knowledge] Job {job_id} still processing (poll {attempt}/{max_attempts})")
 
         print(f"[Knowledge] Job {job_id} timed out after {max_attempts * 15}s of polling")
-        return None
+        return {"_error": f"Search timed out after {max_attempts * 15}s of polling (job_id: {job_id})"}
 
+    except requests.exceptions.ConnectionError as e:
+        print(f"[Knowledge] Connection error: {e}")
+        return {"_error": f"Could not connect to {LOOP_SEARCH_URL} — is the service running?"}
+    except requests.exceptions.HTTPError as e:
+        print(f"[Knowledge] HTTP error: {e}")
+        return {"_error": f"HTTP error from Loop Search API: {e}"}
     except Exception as e:
         print(f"[Knowledge] Call failed: {e}")
-        return None
+        return {"_error": f"Unexpected error: {e}"}
 
 
 def db_save_knowledge(jira_key: str, answer: str, sources_used: str,
@@ -885,16 +895,45 @@ def db_save_knowledge(jira_key: str, answer: str, sources_used: str,
         conn.commit()
 
 
+def db_save_knowledge_error(jira_key: str, error_msg: str):
+    """Save an error message for a failed Cora Knowledge lookup."""
+    with _db() as conn:
+        conn.execute("""
+            UPDATE queue_items
+            SET knowledge_error = ?, knowledge_at = ?
+            WHERE jira_key = ?
+        """, (error_msg, datetime.utcnow().isoformat(), jira_key))
+        conn.commit()
+
+
+def db_clear_knowledge_error(jira_key: str):
+    """Clear any previous knowledge error before a new lookup."""
+    with _db() as conn:
+        conn.execute(
+            "UPDATE queue_items SET knowledge_error = NULL WHERE jira_key = ?",
+            (jira_key,)
+        )
+        conn.commit()
+
+
 def db_get_knowledge(jira_key: str) -> dict | None:
-    """Retrieve the stored knowledge response for a queue item."""
+    """Retrieve the stored knowledge response (or error) for a queue item."""
     with _db() as conn:
         row = conn.execute(
             """SELECT knowledge_answer, knowledge_sources,
-                      knowledge_metadata, knowledge_at
+                      knowledge_metadata, knowledge_at, knowledge_error
                FROM queue_items WHERE jira_key = ?""",
             (jira_key,)
         ).fetchone()
-    if not row or not row["knowledge_answer"]:
+    if not row:
+        return None
+    # Return error if one was saved
+    if row["knowledge_error"]:
+        return {
+            "_error":       row["knowledge_error"],
+            "generated_at": row["knowledge_at"],
+        }
+    if not row["knowledge_answer"]:
         return None
     return {
         "answer":       row["knowledge_answer"],
@@ -1040,11 +1079,16 @@ def process_single_item(job_id: str, issue: dict):
                             print(f"[Knowledge] {k} — skipped (no Jira description)")
                             return
                         kr = call_loop_search(desc)
-                        if kr:
+                        if "_error" in kr:
+                            db_save_knowledge_error(k, kr["_error"])
+                            print(f"[Knowledge] {k} — auto-lookup error: {kr['_error']}")
+                        elif kr.get("answer"):
                             db_save_knowledge(k, kr["answer"],
                                               kr.get("sources_used", ""),
                                               json.dumps(kr.get("metadata", {})))
                             print(f"[Knowledge] {k} — auto-lookup complete")
+                        else:
+                            db_save_knowledge_error(k, "Search returned empty — no answer in response")
                     except Exception as ke:
                         print(f"[Knowledge] {k} — auto-lookup error: {ke}")
                 threading.Thread(target=_auto_knowledge, daemon=True).start()
@@ -1326,11 +1370,17 @@ def trigger_knowledge(jira_key: str):
     if not query:
         return jsonify({"error": "No Jira description available to search."}), 400
 
+    # Clear any previous error before starting
+    db_clear_knowledge_error(jira_key)
+
     # Run in background thread
     def _run():
         try:
             result = call_loop_search(query)
-            if result:
+            if "_error" in result:
+                db_save_knowledge_error(jira_key, result["_error"])
+                print(f"[Knowledge] {jira_key} — error: {result['_error']}")
+            elif result.get("answer"):
                 db_save_knowledge(
                     jira_key,
                     result["answer"],
@@ -1339,8 +1389,10 @@ def trigger_knowledge(jira_key: str):
                 )
                 print(f"[Knowledge] {jira_key} — answer saved ({result.get('sources_used', '')})")
             else:
+                db_save_knowledge_error(jira_key, "Search returned empty — no answer in response")
                 print(f"[Knowledge] {jira_key} — no result returned")
         except Exception as e:
+            db_save_knowledge_error(jira_key, f"Unexpected error: {e}")
             print(f"[Knowledge] {jira_key} — error: {e}")
 
     t = threading.Thread(target=_run, daemon=True)
@@ -1354,6 +1406,9 @@ def get_knowledge(jira_key: str):
     result = db_get_knowledge(jira_key)
     if not result:
         return jsonify({"status": "not_found"}), 200
+    if "_error" in result:
+        return jsonify({"status": "error", "error": result["_error"],
+                        "generated_at": result.get("generated_at")}), 200
     return jsonify({"status": "ready", **result})
 
 

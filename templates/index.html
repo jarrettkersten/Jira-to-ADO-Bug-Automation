@@ -160,6 +160,10 @@ main{width:100%;margin:0;padding:16px 20px;display:flex;flex-direction:column;ga
 .knowledge-empty .icon{font-size:2rem;opacity:.5}
 .knowledge-empty p{font-size:.84rem;line-height:1.5;max-width:260px}
 .knowledge-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:40px;color:var(--muted);height:100%}
+.knowledge-error{display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:12px;padding:30px 24px;height:100%}
+.knowledge-error .icon{font-size:2rem}
+.knowledge-error .error-msg{font-size:.82rem;line-height:1.5;max-width:340px;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 16px;word-break:break-word;text-align:left}
+.knowledge-error .retry-btn{margin-top:4px;font-size:.8rem;padding:6px 14px;cursor:pointer}
 .knowledge-loading .spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--brand-light);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .knowledge-meta{display:flex;gap:12px;flex-wrap:wrap;padding:10px 0 6px;border-top:1px solid var(--border);margin-top:auto;font-size:.72rem;color:var(--muted);flex-shrink:0}
@@ -493,6 +497,11 @@ textarea{resize:vertical;line-height:1.6}
             <div class="spinner"></div>
             <span style="font-size:.84rem">Searching codebase &amp; docs…</span>
             <span style="font-size:.74rem;color:var(--muted)">This can take a few minutes</span>
+          </div>
+          <div class="knowledge-error" id="knowledge-error">
+            <span class="icon">⚠️</span>
+            <div class="error-msg" id="knowledge-error-msg"></div>
+            <button class="action-btn retry-btn" onclick="triggerKnowledge()">↻ Retry</button>
           </div>
           <div id="knowledge-content" style="display:none"></div>
         </div>
@@ -1568,16 +1577,23 @@ async function loadKnowledge(jiraKey) {
     if (d.status === 'ready') {
       showKnowledgeResult(d);
       return;
+    } else if (d.status === 'error') {
+      showKnowledgeError(d.error || 'Previous knowledge lookup failed');
+      return;
     }
   } catch(e) {
     console.warn('Knowledge fetch error:', e);
   }
   // Not ready yet — show empty state
+  document.getElementById('knowledge-error').style.display = 'none';
   document.getElementById('knowledge-empty').style.display = 'flex';
   document.getElementById('knowledge-loading').style.display = 'none';
   document.getElementById('knowledge-content').style.display = 'none';
   document.getElementById('knowledge-meta').style.display = 'none';
 }
+
+let _knowledgePollCount = 0;
+const _knowledgeMaxPolls = 120;  // 120 × 5s = 10 minutes
 
 async function triggerKnowledge() {
   if (!activeItemIdx) return;
@@ -1587,18 +1603,34 @@ async function triggerKnowledge() {
   document.getElementById('knowledge-empty').style.display = 'none';
   document.getElementById('knowledge-content').style.display = 'none';
   document.getElementById('knowledge-meta').style.display = 'none';
+  document.getElementById('knowledge-error').style.display = 'none';
   document.getElementById('knowledge-loading').style.display = 'flex';
   document.getElementById('knowledge-refresh-btn').disabled = true;
 
   try {
-    await fetch(`/api/knowledge/${encodeURIComponent(jiraKey)}`, { method: 'POST' });
+    const resp = await fetch(`/api/knowledge/${encodeURIComponent(jiraKey)}`, { method: 'POST' });
+    if (!resp.ok) {
+      const errData = await resp.json().catch(() => ({}));
+      showKnowledgeError(errData.error || `Failed to start search (HTTP ${resp.status})`);
+      return;
+    }
   } catch(e) {
     console.warn('Knowledge trigger error:', e);
+    showKnowledgeError('Could not reach the server to start the knowledge search.');
+    return;
   }
 
-  // Poll for result
+  // Poll for result with timeout
+  _knowledgePollCount = 0;
   clearInterval(_knowledgePolling);
   _knowledgePolling = setInterval(async () => {
+    _knowledgePollCount++;
+    if (_knowledgePollCount > _knowledgeMaxPolls) {
+      clearInterval(_knowledgePolling);
+      _knowledgePolling = null;
+      showKnowledgeError('Knowledge search timed out after 10 minutes of polling. Try again later.');
+      return;
+    }
     try {
       const r = await fetch(`/api/knowledge/${encodeURIComponent(jiraKey)}`);
       const d = await r.json();
@@ -1606,6 +1638,10 @@ async function triggerKnowledge() {
         clearInterval(_knowledgePolling);
         _knowledgePolling = null;
         showKnowledgeResult(d);
+      } else if (d.status === 'error') {
+        clearInterval(_knowledgePolling);
+        _knowledgePolling = null;
+        showKnowledgeError(d.error || 'Unknown error from Cora Knowledge API');
       }
     } catch(e) { /* keep polling */ }
   }, 5000);
@@ -1631,6 +1667,18 @@ function showKnowledgeResult(data) {
   document.getElementById('km-date').innerHTML =
     data.generated_at ? `📅 ${fmtJiraDate(data.generated_at)}` : '';
   meta.style.display = 'flex';
+}
+
+function showKnowledgeError(msg) {
+  document.getElementById('knowledge-empty').style.display = 'none';
+  document.getElementById('knowledge-loading').style.display = 'none';
+  document.getElementById('knowledge-content').style.display = 'none';
+  document.getElementById('knowledge-meta').style.display = 'none';
+  document.getElementById('knowledge-refresh-btn').disabled = false;
+
+  const errorEl = document.getElementById('knowledge-error');
+  document.getElementById('knowledge-error-msg').textContent = msg;
+  errorEl.style.display = 'flex';
 }
 
 function renderMarkdown(md) {
